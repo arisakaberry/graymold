@@ -426,7 +426,10 @@ def try_multiple_encodings(file_path):
     
     for encoding in encodings:
         try:
+            st.info(f"エンコーディング {encoding} で読み込み試行中...")
             df = pd.read_csv(file_path, encoding=encoding)
+            st.success(f"エンコーディング {encoding} で読み込み成功")
+            st.info(f"列名一覧: {df.columns.tolist()}")
             return df, encoding
         except Exception as e:
             st.info(f"エンコーディング {encoding} での読み込み失敗: {str(e)}")
@@ -438,10 +441,19 @@ def try_multiple_encodings(file_path):
 def combine_date_time(df, date_col='日付', time_col='時刻'):
     """日付列と時刻列を結合してdatetime型の列を作成する関数"""
     try:
-         # 時刻列のクリーニング（*を削除）
+        st.info("日付と時刻の列を変換しています")
+        
+        # 時刻列のクリーニング（*を削除）
         if time_col in df.columns:
+            st.info("時刻列を前処理しています")
+            st.info(f"時刻の最初の5件: {df[time_col].head().tolist()}")
             df[time_col] = df[time_col].astype(str).str.replace('*', '', regex=False)
             df[time_col] = df[time_col].str.strip()
+            st.info(f"処理後の時刻列サンプル: {df[time_col].head().tolist()}")
+        
+        # データ型を確認
+        st.info(f"日付列のデータ型: {df[date_col].dtype}")
+        st.info(f"時刻列のデータ型: {df[time_col].dtype}")
         
         # 行ごとに日時を変換
         dates = []
@@ -483,8 +495,10 @@ def convert_to_numeric(df, columns):
     for col in columns:
         try:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+            st.info(f"{col}を数値型に変換しました。NaN値の数: {df[col].isna().sum()}")
         except Exception as e:
             st.error(f"{col}の数値変換エラー: {str(e)}")
+    
     return df
 
 def resample_to_hourly(df):
@@ -492,21 +506,29 @@ def resample_to_hourly(df):
     try:
         # インデックスがdatetimeかチェック
         if not isinstance(df.index, pd.DatetimeIndex):
+            st.error("データフレームのインデックスがdatetime型ではありません")
             raise ValueError("日時データの変換に失敗しました")
+        
         # 1時間間隔にリサンプリング
         df.index = df.index.floor('H')
         df_hourly = df.groupby(df.index).mean()
+        st.info(f"時間集計後のデータ形状: {df_hourly.shape}")
+        
         # 欠損値の補間
         df_resampled = df_hourly.resample('1H').interpolate()
+        st.info(f"補間後のデータ形状: {df_resampled.shape}")
+        
         return df_resampled
+    
     except Exception as e:
+        st.error(f"リサンプリングエラー: {str(e)}")
         import traceback
         st.text(traceback.format_exc())
         return df
 
 
 # 時系列リスク計算関数
-def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=10):
+def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=28):
     """
     過去X日間の各日におけるリスクを計算する関数
     各日付から遡って10日間(240時間)のウィンドウでリスク判定
@@ -835,6 +857,11 @@ def main():
                 '温度': temperature[:5],
                 '湿度': relative_humidity[:5]
             })
+            st.write("データプレビュー（最初の5行）:")
+            st.dataframe(preview_df)
+            
+            st.write(f"読み込まれたデータポイント数: {len(temperature)}")
+            st.write(f"期間: {min(timestamps)} から {max(timestamps)}")
             
             # 温度・湿度データをリスト化
             temp_humidity_data = list(zip(temperature, relative_humidity))
