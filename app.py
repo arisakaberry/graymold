@@ -724,7 +724,7 @@ def detect_device_type(file_path):
         return 'PF'
     elif 'SwitchBot' in file_name:
         return 'SB'
-    elif 'おんどとり' in file_name or 'ondotori' in file_name.lower():
+    elif 'OT' in file_name:
         return 'OT'
     elif 'HN' in file_name or 'ハウスナビ' in file_name:
         return 'HN'
@@ -739,10 +739,11 @@ def detect_device_type(file_path):
             return 'HZ'
         elif '年月日' in header and '気温' in header:
             return 'PF'
+        elif '日付' in header and '室温' in header or '湿度' in header:
+            return 'OT'
         elif '日付' in header and '時刻' in header and 'PF' in header:
             return 'PF2'
-        elif '日付' in header and ('室温' in header or '湿度' in header):
-            return 'OT'
+
     except UnicodeDecodeError:
         # UTF-8で試す
         try:
@@ -767,235 +768,6 @@ def detect_device_type(file_path):
     # 推測できない場合
     print("警告: デバイスタイプを自動検出できません。PFとして処理を試みます。")
     return 'PF'
-
-def read_hz_data(file_path):
-    """はかる蔵データの読み込み"""
-    try:
-        df = pd.read_csv(file_path, encoding="shift-JIS", engine="python")
-        
-        # 日付列をdatetime型に変換
-        df['datetime'] = pd.to_datetime(df['日付'])
-        df = df.set_index('datetime')
-        
-        # 温度と湿度の列を特定
-        temp_col = None
-        humid_col = None
-        
-        for col in df.columns:
-            if '温度' in col:
-                temp_col = col
-            elif '湿度' in col:
-                humid_col = col
-        
-        if temp_col is None or humid_col is None:
-            raise ValueError("温度または湿度の列が見つかりません")
-        
-        # 必要な列のみ抽出
-        result_df = pd.DataFrame()
-        result_df['temperature'] = df[temp_col]
-        result_df['humidity'] = df[humid_col]
-        
-        return result_df
-    
-    except Exception as e:
-        print(f"HZデータ読み込みエラー: {str(e)}")
-        return pd.DataFrame()
-
-def read_pf_data(file_path):
-    """プロファインダー(旧型)データの読み込み"""
-    try:
-        df = pd.read_csv(file_path, encoding="shift-JIS", engine="python")
-        
-        # 日付列をdatetime型に変換
-        df['datetime'] = pd.to_datetime(df['年月日'])
-        df = df.set_index('datetime')
-        
-        # 温度と湿度の列を特定
-        temp_col = '気温' if '気温' in df.columns else None
-        humid_col = '相対湿度' if '相対湿度' in df.columns else None
-        
-        if temp_col is None or humid_col is None:
-            # 列名が標準でない場合、含まれる文字列で検索
-            for col in df.columns:
-                if '温' in col or '気温' in col:
-                    temp_col = col
-                elif '湿' in col or '相対湿度' in col:
-                    humid_col = col
-        
-        if temp_col is None or humid_col is None:
-            raise ValueError("温度または湿度の列が見つかりません")
-        
-        # 必要な列のみ抽出
-        result_df = pd.DataFrame()
-        result_df['temperature'] = df[temp_col]
-        result_df['humidity'] = df[humid_col]
-        
-        return result_df
-    
-    except Exception as e:
-        print(f"PFデータ読み込みエラー: {str(e)}")
-        return pd.DataFrame()
-
-def read_pf2_data(file_path):
-    """プロファインダー(新型)データの読み込み"""
-    try:
-        df = pd.read_csv(file_path, encoding="shift-JIS", engine="python")
-        
-        # 時刻列のクリーニング
-        if '時刻' in df.columns:
-            df['時刻'] = df['時刻'].str.replace('*', '')
-        
-        # 日付と時刻を結合してdatetime列を作成
-        df['datetime'] = pd.to_datetime(df['日付'].astype(str) + ' ' + df['時刻'].astype(str))
-        df = df.set_index('datetime')
-        
-        # 温度と湿度の列を特定
-        temp_cols = [col for col in df.columns if '気温' in col or '室温' in col]
-        humid_cols = [col for col in df.columns if '湿度' in col]
-        
-        if not temp_cols or not humid_cols:
-            raise ValueError("温度または湿度の列が見つかりません")
-        
-        # 複数候補がある場合は最初のものを使用
-        temp_col = temp_cols[0]
-        humid_col = humid_cols[0]
-        
-        # 必要な列のみ抽出
-        result_df = pd.DataFrame()
-        result_df['temperature'] = df[temp_col]
-        result_df['humidity'] = df[humid_col]
-        
-        return result_df
-    
-    except Exception as e:
-        print(f"PF2データ読み込みエラー: {str(e)}")
-        return pd.DataFrame()
-
-def read_sb_data(file_path):
-    """SwitchBotデータの読み込み"""
-    try:
-        df = pd.read_csv(file_path, encoding="utf-8", engine="python")
-        
-        # タイムスタンプ列を特定
-        date_col = 'Timestamp' if 'Timestamp' in df.columns else 'Date'
-        
-        # 日付列をdatetime型に変換
-        df['datetime'] = pd.to_datetime(df[date_col])
-        df = df.set_index('datetime')
-        
-        # 温度と湿度の列を特定
-        temp_cols = [col for col in df.columns if 'Temperature' in col and 'Celsius' in col]
-        humid_cols = [col for col in df.columns if 'Humidity' in col]
-        
-        if not temp_cols or not humid_cols:
-            raise ValueError("温度または湿度の列が見つかりません")
-        
-        temp_col = temp_cols[0]
-        humid_col = humid_cols[0]
-        
-        # 必要な列のみ抽出
-        result_df = pd.DataFrame()
-        result_df['temperature'] = df[temp_col]
-        result_df['humidity'] = df[humid_col]
-        
-        return result_df
-    
-    except Exception as e:
-        print(f"SwitchBotデータ読み込みエラー: {str(e)}")
-        return pd.DataFrame()
-
-def read_ot_data(file_path):
-    """おんどとりデータの読み込み"""
-    try:
-        df = pd.read_csv(file_path, encoding="shift-JIS", engine="python")
-        
-        # 日付列をdatetime型に変換
-        df['datetime'] = pd.to_datetime(df['日付'])
-        df = df.set_index('datetime')
-        
-        # 温度と湿度の列を特定
-        temp_col = '室温' if '室温' in df.columns else None
-        humid_col = '湿度' if '湿度' in df.columns else None
-        
-        if temp_col is None or humid_col is None:
-            # 列名が標準でない場合、含まれる文字列で検索
-            for col in df.columns:
-                if '温' in col:
-                    temp_col = col
-                elif '湿' in col:
-                    humid_col = col
-        
-        if temp_col is None or humid_col is None:
-            raise ValueError("温度または湿度の列が見つかりません")
-        
-        # 必要な列のみ抽出
-        result_df = pd.DataFrame()
-        result_df['temperature'] = df[temp_col]
-        result_df['humidity'] = df[humid_col]
-        
-        return result_df
-    
-    except Exception as e:
-        print(f"おんどとりデータ読み込みエラー: {str(e)}")
-        return pd.DataFrame()
-
-def read_hn_data(file_path):
-    """ハウスナビデータの読み込み"""
-    try:
-        # 様々なエンコーディングで試行
-        for encoding in ['utf-8-sig', 'utf-8', 'shift-jis']:
-            try:
-                with open(file_path, 'r', encoding=encoding) as f:
-                    header = f.readline().strip()
-                
-                dates = []
-                temps = []
-                humids = []
-                
-                with open(file_path, 'r', encoding=encoding) as f:
-                    f.readline()  # ヘッダー行をスキップ
-                    for line in f:
-                        if not line.strip():
-                            continue
-                        
-                        parts = line.strip().split(',')
-                        if len(parts) < 8:  # 最低限必要なカラム数をチェック
-                            continue
-                        
-                        try:
-                            # 日時の解析
-                            date_str = parts[0].strip()
-                            date = pd.to_datetime(date_str)
-                            
-                            # 温度と湿度の抽出（列位置はファイルに依存）
-                            temp = float(parts[6].strip() or 0)
-                            humid = float(parts[7].strip() or 0)
-                            
-                            dates.append(date)
-                            temps.append(temp)
-                            humids.append(humid)
-                        except:
-                            continue
-                
-                if not dates:
-                    continue
-                
-                # DataFrameの作成
-                result_df = pd.DataFrame({
-                    'temperature': temps,
-                    'humidity': humids
-                }, index=pd.DatetimeIndex(dates))
-                
-                return result_df
-                
-            except:
-                continue
-        
-        raise ValueError("ハウスナビデータの読み込みに失敗しました")
-    
-    except Exception as e:
-        print(f"ハウスナビデータ読み込みエラー: {str(e)}")
-        return pd.DataFrame()
 
 def resample_to_hourly(df):
     """データを1時間間隔にリサンプリング"""
