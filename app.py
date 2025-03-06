@@ -370,21 +370,39 @@ def resample_to_hourly(df):
             st.error("データフレームのインデックスがdatetime型ではありません")
             raise ValueError("日時データの変換に失敗しました")
         
-        # 1時間間隔にリサンプリング (より単純なアプローチを採用)
-        st.info("1時間間隔へのリサンプリングを実行中...")
-        # まずインデックスを時間単位に切り捨て
-        df.index = df.index.floor('H')
-        st.info(f"インデックス切り捨て後のサンプル: {df.index[:5].tolist() if len(df) > 0 else []}")
+        # データ型を確認
+        st.info(f"リサンプリング前のデータ形状: {df.shape}")
+        st.info(f"列の型情報: {df.dtypes}")
         
-        # 同じ時間帯のデータをグループ化して平均値を計算
-        df_hourly = df.groupby(df.index).mean()
+        # 非数値列を除外
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        st.info(f"数値型の列: {numeric_cols}")
+        
+        if not numeric_cols:
+            st.error("数値型の列が見つかりません")
+            return df
+        
+        # 数値列のみを使用
+        numeric_df = df[numeric_cols].copy()
+        
+        # 1時間間隔にリサンプリング
+        st.info("1時間間隔へのリサンプリングを実行中...")
+        numeric_df.index = numeric_df.index.floor('H')
+        
+        # デバッグ情報
+        sample_idx = numeric_df.index[:5].tolist() if len(numeric_df) > 0 else []
+        st.info(f"インデックス切り捨て後のサンプル: {sample_idx}")
+        
+        # この時点でインデックスは時間単位に切り捨てられています
+        # グループ化とリサンプリング
+        df_hourly = numeric_df.groupby(numeric_df.index).mean()
         st.info(f"時間集計後のデータ形状: {df_hourly.shape}")
         
-        # 欠損値の補間 (時系列データに適したmethod='time'を使用)
+        # 欠損値の補間 (時系列データに適した method='time' を使用)
         df_resampled = df_hourly.resample('1H').interpolate(method='time')
         st.info(f"補間後のデータ形状: {df_resampled.shape}")
         
-        # デバッグ情報を追加
+        # デバッグ情報
         if not df_resampled.empty:
             st.info(f"リサンプリング後のインデックス範囲: {df_resampled.index.min()} から {df_resampled.index.max()}")
             st.info(f"リサンプリング後のデータサンプル: \n{df_resampled.head(3)}")
@@ -396,7 +414,7 @@ def resample_to_hourly(df):
         import traceback
         st.text(traceback.format_exc())
         return df
-
+    
 # 時系列リスク計算関数
 def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=28):
     """
