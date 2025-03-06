@@ -857,73 +857,67 @@ def main():
                 # 温度・湿度データをリスト化
                 temp_humidity_data = list(zip(temperature, relative_humidity))
 
-                # 現在のリスク計算（最新10日間のデータで計算）
+                # 現在のリスク計算（最新の10日間）
                 current_risk_level, current_risk_hours, current_color = check_gray_mold_risk(temp_humidity_data, timestamps)
                 
                 # 時系列リスク計算
                 time_series_risk_df = calculate_time_series_risk(temp_humidity_data, timestamps)
                 
-                # タブを使用して結果を表示
-                tab1, tab2 = st.tabs(["現在リスク", "時系列リスク推移"])
+                # 1. メインの現在リスク表示（スピードメーター）
+                st.header("現在の灰色かび病リスク")
+                st.write("（最新日から10日間さかのぼったデータに基づく計算）")
                 
-                with tab1:
-                    st.subheader("現在の灰色かび病リスク")
-                    st.write("（最新日から10日間さかのぼったデータに基づく計算）")
-                    st.markdown(f"<h3 style='color: {current_color};'>灰色かび病の発病リスク: {current_risk_level}</h3>", unsafe_allow_html=True)
-                    st.write(f"条件を満たす時間数: {current_risk_hours}時間")
-                    # 以下は同じ
+                # リスクレベル表示
+                st.markdown(f"<h3 style='color: {current_color};'>灰色かび病の発病リスク: {current_risk_level}</h3>", unsafe_allow_html=True)
+                st.write(f"条件を満たす時間数: {current_risk_hours}時間")
 
-                    recommendations = {
-                        "極低": "本病の発生リスクは極めて低いので、他作業（収穫等）に集中してください。",
-                        "低": "本病の発生リスクは低いですが、耕種的防除を実施するとなお良いでしょう。",
-                        "中": "予防的な耕種的防除及び薬剤防除の実施がお勧めです。",
-                        "高": "耕種的防除と薬剤防除の実施が必要です。",
-                        "極高": "今すぐに耕種的防除と薬剤防除の実施が必要です。"
-                    }
+                # 推奨対策表示
+                recommendations = {
+                    "極低": "本病の発生リスクは極めて低いので、他作業（収穫等）に集中してください。",
+                    "低": "本病の発生リスクは低いですが、耕種的防除を実施するとなお良いでしょう。",
+                    "中": "予防的な耕種的防除及び薬剤防除の実施がお勧めです。",
+                    "高": "耕種的防除と薬剤防除の実施が必要です。",
+                    "極高": "今すぐに耕種的防除と薬剤防除の実施が必要です。"
+                }
+                st.write(f"推奨対策: {recommendations[current_risk_level]}")
+                st.write(f"データ総数: {len(temp_humidity_data)}時間分")
 
-                    st.write(f"推奨対策: {recommendations[current_risk_level]}")
-                    st.write(f"データ総数: {len(temp_humidity_data)}時間分")
-
-                    # スピードメーターのみを表示
-                    risk_viz_fig = display_risk_visualization(current_risk_level, current_risk_hours)
-                    st.pyplot(risk_viz_fig)
+                # スピードメーターを表示
+                risk_viz_fig = display_risk_visualization(current_risk_level, current_risk_hours)
+                st.pyplot(risk_viz_fig)
                 
-                with tab2:
-                    st.subheader("過去14日間の灰色かび病リスク推移")
+                # 区切り線を表示
+                st.markdown("---")
+                
+                # 2. 時系列リスクの棒グラフ表示
+                if not time_series_risk_df.empty:
+                    st.header("過去14日間の灰色かび病リスク推移（棒グラフ）")
+                    bar_fig = plot_risk_bar_chart(time_series_risk_df)
+                    st.pyplot(bar_fig)
                     
-                    if not time_series_risk_df.empty:
-                        # 表示オプション
-                        viz_type = st.radio(
-                            "表示タイプ:",
-                            ["棒グラフ", "ヒートマップ"],
-                            horizontal=True
-                        )
+                    # 区切り線を表示
+                    st.markdown("---")
+                    
+                    # 3. 時系列リスクのヒートマップ表示
+                    st.header("過去14日間の灰色かび病リスク推移（ヒートマップ）")
+                    # ヒートマップのカラーマップを灰色→青→緑→オレンジ→赤に修正
+                    heat_fig = plot_risk_heatmap(time_series_risk_df)
+                    st.pyplot(heat_fig)
+                    
+                    # 詳細データテーブルを表示
+                    with st.expander("詳細データを表示"):
+                        display_df = time_series_risk_df[['date', 'risk_hours', 'risk_level']].copy()
                         
-                        if viz_type == "棒グラフ":
-                            # 棒グラフを表示
-                            bar_fig = plot_risk_bar_chart(time_series_risk_df)
-                            st.pyplot(bar_fig)
+                        # .dt アクセサーを使う前に型チェックを追加
+                        if pd.api.types.is_datetime64_any_dtype(display_df['date']):
+                            display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
                         else:
-                            # ヒートマップを表示
-                            heat_fig = plot_risk_heatmap(time_series_risk_df)
-                            st.pyplot(heat_fig)
+                            display_df['date'] = display_df['date'].astype(str)
                         
-                        # 詳細データテーブルを表示（オプション）
-                        with st.expander("詳細データを表示"):
-                            display_df = time_series_risk_df[['date', 'risk_hours', 'risk_level']].copy()
-                            
-                            # .dt アクセサーを使う前に型チェックを追加
-                            if pd.api.types.is_datetime64_any_dtype(display_df['date']):
-                                # datetime型の場合はdt.strftimeを使用
-                                display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
-                            else:
-                                # すでに文字列または別の型の場合は単純に文字列変換
-                                display_df['date'] = display_df['date'].astype(str)
-                            
-                            display_df.columns = ['日付', 'リスク時間数', 'リスクレベル']
-                            st.dataframe(display_df)
-                    else:
-                        st.warning("表示可能な時系列データがありません。より長期間のデータを含むCSVファイルをアップロードしてください。")
+                        display_df.columns = ['日付', 'リスク時間数', 'リスクレベル']
+                        st.dataframe(display_df)
+                else:
+                    st.warning("表示可能な時系列データがありません。より長期間のデータを含むCSVファイルをアップロードしてください。")
     
     # アプリの使い方や説明を右側のカラムに表示
     with col2:
