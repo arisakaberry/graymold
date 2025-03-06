@@ -600,11 +600,23 @@ def plot_risk_bar_chart(risk_df):
     # 日付を文字列フォーマットに変換
     date_labels = [d.strftime('%m/%d') for d in risk_df['date']]
     
+    # リスクレベルに対応する色を更新
+    risk_colors = {
+        "極低": "#0000cc",  # 青
+        "低": "#0000cc",    # 青
+        "中": "#00cc00",    # 緑
+        "高": "#ff8000",    # オレンジ
+        "極高": "#cc0000"   # 赤
+    }
+    
+    # データに基づく色のリスト作成
+    bar_colors = [risk_colors[level] for level in risk_df['risk_level']]
+    
     # 棒グラフをプロット
     bars = ax.bar(
         date_labels, 
         risk_df['risk_hours'],
-        color=risk_df['color'],
+        color=bar_colors,
         width=0.7
     )
     
@@ -617,14 +629,14 @@ def plot_risk_bar_chart(risk_df):
     
     ax.set_title('過去14日間の灰色かび病リスク推移')
     
-    # リスクレベルの凡例を追加
+    # リスクレベルの凡例を更新
     from matplotlib.patches import Patch
     legend_elements = [
-        Patch(facecolor='gray', label='極低 (0時間)'),
-        Patch(facecolor='blue', label='低 (1-10時間)'),
-        Patch(facecolor='green', label='中 (11-20時間)'),
-        Patch(facecolor='orange', label='高 (21-30時間)'),
-        Patch(facecolor='red', label='極高 (31時間以上)')
+        Patch(facecolor=risk_colors["極低"], label='極低 (0時間)'),
+        Patch(facecolor=risk_colors["低"], label='低 (1-10時間)'),
+        Patch(facecolor=risk_colors["中"], label='中 (11-20時間)'),
+        Patch(facecolor=risk_colors["高"], label='高 (21-30時間)'),
+        Patch(facecolor=risk_colors["極高"], label='極高 (31時間以上)')
     ]
     ax.legend(handles=legend_elements, loc='upper right')
     
@@ -704,13 +716,13 @@ def display_risk_visualization(risk_level, risk_hours):
     """
     リスク表示関数（スピードメーターのみ対応）
     """
-    # リスクレベルに対応する色を取得
+    # リスクレベルに対応する色を更新
     colors = {
-        "極低": "gray",
-        "低": "blue",
-        "中": "green", 
-        "高": "orange",
-        "極高": "red"
+        "極低": "#0000cc",  # 青
+        "低": "#0000cc",    # 青
+        "中": "#00cc00",    # 緑
+        "高": "#ff8000",    # オレンジ
+        "極高": "#cc0000"   # 赤
     }
     color = colors[risk_level]
     
@@ -803,144 +815,118 @@ def main():
     st.set_page_config(page_title="イチゴ灰色かび病リスク計算", layout="wide")
     st.title("イチゴ灰色かび病リスク計算")
 
-    # メインコンテンツエリアを2カラムに分割
-    col1, col2 = st.columns([3, 1])
 
-    with col1:
-        st.header("CSVファイルアップロード")
-        
-        # デバイスタイプを選択するオプションを追加
-        device_type = st.selectbox(
-            "センサーのタイプを選択してください",
-            ["自動検出", "HZ (はかる蔵)", "PF (プロファインダー旧型)", "PF2 (プロファインダー新型)", 
-             "SB (スイッチボット)", "OT (おんどとり)", "HN (ハウスナビ)"]
-        )
-        
-        # マッピング辞書
-        device_map = {
-            "自動検出": None,
-            "HZ (はかる蔵)": "HZ",
-            "PF (プロファインダー旧型)": "PF",
-            "PF2 (プロファインダー新型)": "PF2",
-            "SB (スイッチボット)": "SB",
-            "OT (おんどとり)": "OT",
-            "HN (ハウスナビ)": "HN"
-        }
-        
-        # ファイルアップローダー
-        uploaded_file = st.file_uploader("CSVファイルを選択してください", type=["csv", "xlsx", "xls"])
+    st.header("CSVファイルアップロード")
+    
+    # デバイスタイプを選択するオプションを追加
+    device_type = st.selectbox(
+        "センサーのタイプを選択してください",
+        ["自動検出", "HZ (はかる蔵)", "PF (プロファインダー旧型)", "PF2 (プロファインダー新型)", 
+            "SB (スイッチボット)", "OT (おんどとり)", "HN (ハウスナビ)"]
+    )
+    
+    # マッピング辞書
+    device_map = {
+        "自動検出": None,
+        "HZ (はかる蔵)": "HZ",
+        "PF (プロファインダー旧型)": "PF",
+        "PF2 (プロファインダー新型)": "PF2",
+        "SB (スイッチボット)": "SB",
+        "OT (おんどとり)": "OT",
+        "HN (ハウスナビ)": "HN"
+    }
+    
+    # ファイルアップローダー
+    uploaded_file = st.file_uploader("CSVファイルを選択してください", type=["csv", "xlsx", "xls"])
 
-        if uploaded_file is not None:
-            # 選択されたデバイスタイプを取得
-            selected_device = device_map[device_type]
+    if uploaded_file is not None:
+        # 選択されたデバイスタイプを取得
+        selected_device = device_map[device_type]
+        
+        # プログレスバーで処理状況を表示
+        with st.spinner('ファイルを読み込んでいます...'):
+            # 拡張版関数を使用してデータを読み込む
+            temperature, relative_humidity, timestamps = read_temperature_and_humidity_data(
+                uploaded_file, device_type=selected_device
+            )
+
+        if temperature is not None and relative_humidity is not None:
+            # データのプレビューを表示
+            preview_df = pd.DataFrame({
+                '日時': timestamps[:5],
+                '温度': temperature[:5],
+                '湿度': relative_humidity[:5]
+            })
+            st.write("データプレビュー（最初の5行）:")
+            st.dataframe(preview_df)
             
-            # プログレスバーで処理状況を表示
-            with st.spinner('ファイルを読み込んでいます...'):
-                # 拡張版関数を使用してデータを読み込む
-                temperature, relative_humidity, timestamps = read_temperature_and_humidity_data(
-                    uploaded_file, device_type=selected_device
-                )
+            st.write(f"読み込まれたデータポイント数: {len(temperature)}")
+            st.write(f"期間: {min(timestamps)} から {max(timestamps)}")
+            
+            # 温度・湿度データをリスト化
+            temp_humidity_data = list(zip(temperature, relative_humidity))
 
-            if temperature is not None and relative_humidity is not None:
-                # データのプレビューを表示
-                preview_df = pd.DataFrame({
-                    '日時': timestamps[:5],
-                    '温度': temperature[:5],
-                    '湿度': relative_humidity[:5]
-                })
-                st.write("データプレビュー（最初の5行）:")
-                st.dataframe(preview_df)
-                
-                st.write(f"読み込まれたデータポイント数: {len(temperature)}")
-                st.write(f"期間: {min(timestamps)} から {max(timestamps)}")
-                
-                # 温度・湿度データをリスト化
-                temp_humidity_data = list(zip(temperature, relative_humidity))
+            # 現在のリスク計算（最新の10日間）
+            current_risk_level, current_risk_hours, current_color = check_gray_mold_risk(temp_humidity_data, timestamps)
+            
+            # 時系列リスク計算
+            time_series_risk_df = calculate_time_series_risk(temp_humidity_data, timestamps)
+            
+            # 1. メインの現在リスク表示（スピードメーター）
+            st.header("現在の灰色かび病リスク")
+            st.write("（最新日から10日間さかのぼったデータに基づく計算）")
+            
+            # リスクレベル表示
+            st.markdown(f"<h3 style='color: {current_color};'>灰色かび病の発病リスク: {current_risk_level}</h3>", unsafe_allow_html=True)
+            st.write(f"条件を満たす時間数: {current_risk_hours}時間")
 
-                # 現在のリスク計算（最新の10日間）
-                current_risk_level, current_risk_hours, current_color = check_gray_mold_risk(temp_humidity_data, timestamps)
-                
-                # 時系列リスク計算
-                time_series_risk_df = calculate_time_series_risk(temp_humidity_data, timestamps)
-                
-                # 1. メインの現在リスク表示（スピードメーター）
-                st.header("現在の灰色かび病リスク")
-                st.write("（最新日から10日間さかのぼったデータに基づく計算）")
-                
-                # リスクレベル表示
-                st.markdown(f"<h3 style='color: {current_color};'>灰色かび病の発病リスク: {current_risk_level}</h3>", unsafe_allow_html=True)
-                st.write(f"条件を満たす時間数: {current_risk_hours}時間")
+            # 推奨対策表示
+            recommendations = {
+                "極低": "本病の発生リスクは極めて低いので、他作業（収穫等）に集中してください。",
+                "低": "本病の発生リスクは低いですが、耕種的防除を実施するとなお良いでしょう。",
+                "中": "予防的な耕種的防除及び薬剤防除の実施がお勧めです。",
+                "高": "耕種的防除と薬剤防除の実施が必要です。",
+                "極高": "今すぐに耕種的防除と薬剤防除の実施が必要です。"
+            }
+            st.write(f"推奨対策: {recommendations[current_risk_level]}")
+            st.write(f"データ総数: {len(temp_humidity_data)}時間分")
 
-                # 推奨対策表示
-                recommendations = {
-                    "極低": "本病の発生リスクは極めて低いので、他作業（収穫等）に集中してください。",
-                    "低": "本病の発生リスクは低いですが、耕種的防除を実施するとなお良いでしょう。",
-                    "中": "予防的な耕種的防除及び薬剤防除の実施がお勧めです。",
-                    "高": "耕種的防除と薬剤防除の実施が必要です。",
-                    "極高": "今すぐに耕種的防除と薬剤防除の実施が必要です。"
-                }
-                st.write(f"推奨対策: {recommendations[current_risk_level]}")
-                st.write(f"データ総数: {len(temp_humidity_data)}時間分")
-
-                # スピードメーターを表示
-                risk_viz_fig = display_risk_visualization(current_risk_level, current_risk_hours)
-                st.pyplot(risk_viz_fig)
+            # スピードメーターを表示
+            risk_viz_fig = display_risk_visualization(current_risk_level, current_risk_hours)
+            st.pyplot(risk_viz_fig)
+            
+            # 区切り線を表示
+            st.markdown("---")
+            
+            # 2. 時系列リスクの棒グラフ表示
+            if not time_series_risk_df.empty:
+                st.header("過去14日間の灰色かび病リスク推移（棒グラフ）")
+                bar_fig = plot_risk_bar_chart(time_series_risk_df)
+                st.pyplot(bar_fig)
                 
                 # 区切り線を表示
                 st.markdown("---")
                 
-                # 2. 時系列リスクの棒グラフ表示
-                if not time_series_risk_df.empty:
-                    st.header("過去14日間の灰色かび病リスク推移（棒グラフ）")
-                    bar_fig = plot_risk_bar_chart(time_series_risk_df)
-                    st.pyplot(bar_fig)
+                # 3. 時系列リスクのヒートマップ表示
+                st.header("過去14日間の灰色かび病リスク推移（ヒートマップ）")
+                # ヒートマップのカラーマップを灰色→青→緑→オレンジ→赤に修正
+                heat_fig = plot_risk_heatmap(time_series_risk_df)
+                st.pyplot(heat_fig)
+                
+                # 詳細データテーブルを表示
+                with st.expander("詳細データを表示"):
+                    display_df = time_series_risk_df[['date', 'risk_hours', 'risk_level']].copy()
                     
-                    # 区切り線を表示
-                    st.markdown("---")
+                    # .dt アクセサーを使う前に型チェックを追加
+                    if pd.api.types.is_datetime64_any_dtype(display_df['date']):
+                        display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
+                    else:
+                        display_df['date'] = display_df['date'].astype(str)
                     
-                    # 3. 時系列リスクのヒートマップ表示
-                    st.header("過去14日間の灰色かび病リスク推移（ヒートマップ）")
-                    # ヒートマップのカラーマップを灰色→青→緑→オレンジ→赤に修正
-                    heat_fig = plot_risk_heatmap(time_series_risk_df)
-                    st.pyplot(heat_fig)
-                    
-                    # 詳細データテーブルを表示
-                    with st.expander("詳細データを表示"):
-                        display_df = time_series_risk_df[['date', 'risk_hours', 'risk_level']].copy()
-                        
-                        # .dt アクセサーを使う前に型チェックを追加
-                        if pd.api.types.is_datetime64_any_dtype(display_df['date']):
-                            display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
-                        else:
-                            display_df['date'] = display_df['date'].astype(str)
-                        
-                        display_df.columns = ['日付', 'リスク時間数', 'リスクレベル']
-                        st.dataframe(display_df)
-                else:
-                    st.warning("表示可能な時系列データがありません。より長期間のデータを含むCSVファイルをアップロードしてください。")
-    
-    # アプリの使い方や説明を右側のカラムに表示
-    with col2:
-        st.header("灰色かび病リスクについて")
-        st.info("""
-        ## リスク判定基準
-        - 温度15-25℃かつ相対湿度94%以上の条件が一定時間以上継続すると発病リスクが高まります
-        - 過去10日間（240時間）の中で条件を満たす時間数をカウントしています
-        
-        ## リスクレベル
-        - **極低**（0時間）：発病リスクなし
-        - **低**（1-10時間）：発病リスク低
-        - **中**（11-20時間）：発病リスク中
-        - **高**（21-30時間）：発病リスク高
-        - **極高**（31時間以上）：発病リスク極高
-        """)
-        
-        # 時系列データに関する補足説明
-        st.markdown("### 時系列データについて")
-        st.info("""
-        「時系列リスク推移」タブでは、過去14日間の日ごとのリスク状況を確認できます。
-        各日付で、その日を含む過去10日間のリスク時間数を表示しています。
-        """)
+                    display_df.columns = ['日付', 'リスク時間数', 'リスクレベル']
+                    st.dataframe(display_df)
+            else:
+                st.warning("表示可能な時系列データがありません。より長期間のデータを含むCSVファイルをアップロードしてください。")
 
 # ヒートマップ表示関数（新しい時系列表示オプション）
 def plot_risk_heatmap(risk_df):
@@ -951,14 +937,12 @@ def plot_risk_heatmap(risk_df):
     risk_df = risk_df.sort_values('date')
     date_labels = [d.strftime('%m/%d') for d in risk_df['date']]
     
-    # カラーマップの設定（灰色→青→緑→オレンジ→赤）
-    # カスタムカラーマップを作成
+    # カラーマップの設定（青→緑→オレンジ→赤）
     from matplotlib.colors import LinearSegmentedColormap
-    colors = [(0.8, 0.8, 0.8),  # 灰色
-              (0.0, 0.0, 0.8),  # 青色
-              (0.0, 0.8, 0.0),  # 緑色
-              (1.0, 0.5, 0.0),  # オレンジ
-              (0.8, 0.0, 0.0)]  # 赤色
+    colors = [(0.0, 0.0, 0.8),  # 青（極低・低リスク）
+              (0.0, 0.8, 0.0),  # 緑（中リスク）
+              (1.0, 0.5, 0.0),  # オレンジ（高リスク）
+              (0.8, 0.0, 0.0)]  # 赤（極高リスク）
     
     risk_cmap = LinearSegmentedColormap.from_list('risk_cmap', colors)
     norm = plt.Normalize(0, 40)  # 0-40時間の範囲
@@ -968,7 +952,7 @@ def plot_risk_heatmap(risk_df):
     
     # ヒートマップの描画
     heatmap = ax.pcolormesh(risk_matrix, cmap=risk_cmap, norm=norm, edgecolors='white', linewidth=1)
-    
+
     # カラーバーの追加
     cbar = plt.colorbar(heatmap, ax=ax, orientation='vertical', pad=0.01)
     cbar.set_label('条件を満たす時間数')
