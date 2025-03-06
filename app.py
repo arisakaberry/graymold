@@ -528,7 +528,7 @@ def resample_to_hourly(df):
 
 
 # 時系列リスク計算関数
-def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=14):
+def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=2828):
     """
     過去X日間の各日におけるリスクを計算する関数
     各日付から遡って10日間(240時間)のウィンドウでリスク判定
@@ -908,7 +908,7 @@ def main():
                 st.markdown("---")
                 
                 # 3. 時系列リスクのヒートマップ表示
-                st.header("過去14日間の灰色かび病リスク推移（ヒートマップ）")
+                st.header("過去28日間の灰色かび病リスク推移（ヒートマップ）")
                 # ヒートマップのカラーマップを灰色→青→緑→オレンジ→赤に修正
                 heat_fig = plot_risk_heatmap(time_series_risk_df)
                 st.pyplot(heat_fig)
@@ -977,7 +977,7 @@ def plot_risk_heatmap(risk_df):
         ax.text(i + 0.5, 0.5, marker, ha='center', va='center', fontsize=15)
     
     # タイトルと凡例
-    ax.set_title('過去14日間の灰色かび病リスク（ヒートマップ）')
+    ax.set_title('過去28日間の灰色かび病リスク（ヒートマップ）')
     
     # 凡例の追加
     from matplotlib.lines import Line2D
