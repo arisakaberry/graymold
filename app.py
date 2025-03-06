@@ -957,15 +957,23 @@ def plot_risk_heatmap(risk_df):
     risk_df = risk_df.sort_values('date')
     date_labels = [d.strftime('%m/%d') for d in risk_df['date']]
     
-    # カラーマップの設定（白→灰→青→緑→オレンジ→赤）
-    cmap = plt.cm.get_cmap('RdYlGn_r')
+    # カラーマップの設定（灰色→青→緑→オレンジ→赤）
+    # カスタムカラーマップを作成
+    from matplotlib.colors import LinearSegmentedColormap
+    colors = [(0.8, 0.8, 0.8),  # 灰色
+              (0.0, 0.0, 0.8),  # 青色
+              (0.0, 0.8, 0.0),  # 緑色
+              (1.0, 0.5, 0.0),  # オレンジ
+              (0.8, 0.0, 0.0)]  # 赤色
+    
+    risk_cmap = LinearSegmentedColormap.from_list('risk_cmap', colors)
     norm = plt.Normalize(0, 40)  # 0-40時間の範囲
     
     # リスク時間数を2D配列に変換（1行×日数列のマトリックス）
     risk_matrix = risk_df['risk_hours'].values.reshape(1, -1)
     
     # ヒートマップの描画
-    heatmap = ax.pcolormesh(risk_matrix, cmap=cmap, norm=norm, edgecolors='white', linewidth=1)
+    heatmap = ax.pcolormesh(risk_matrix, cmap=risk_cmap, norm=norm, edgecolors='white', linewidth=1)
     
     # カラーバーの追加
     cbar = plt.colorbar(heatmap, ax=ax, orientation='vertical', pad=0.01)
