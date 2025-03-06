@@ -234,7 +234,7 @@ def read_temperature_and_humidity_data(file_obj, device_type=None):
                 'encoding': 'shift-jis'
             },
             'PF2': {
-                'temp_cols': ['気温', '室温', 'PF 測定 気温'],
+                'temp_cols': ['PF 測定 気温'],
                 'humid_cols': ['湿度'],
                 'timestamp_cols': ['datetime'],
                 'encoding': 'shift-jis',
@@ -718,14 +718,15 @@ def detect_device_type(file_path):
     file_name = os.path.basename(file_path)
     if 'HZ' in file_name:
         return 'HZ'
+    elif 'OT' in file_name:
+        return 'OT'
     elif 'PF2' in file_name:
         return 'PF2'
     elif 'PF' in file_name:
         return 'PF'
     elif 'SwitchBot' in file_name:
         return 'SB'
-    elif 'OT' in file_name:
-        return 'OT'
+
     elif 'HN' in file_name or 'ハウスナビ' in file_name:
         return 'HN'
     
@@ -741,7 +742,7 @@ def detect_device_type(file_path):
             return 'PF'
         elif '日付' in header and '室温' in header or '湿度' in header:
             return 'OT'
-        elif '日付' in header and '時刻' in header and 'PF' in header:
+        elif '日時' in header and '潅水' in header and 'PF' in header:
             return 'PF2'
 
     except UnicodeDecodeError:
