@@ -38,7 +38,7 @@ def check_gray_mold_risk(temp_humidity_data: List[Tuple[float, float]], timestam
     
     # リスクレベルとカラーを決定
     if risk_hours == 0:
-        return "極低", risk_hours, "gray"
+        return "極低", risk_hours, "blue"
     elif 0 < risk_hours <= 10:
         return "低", risk_hours, "blue"
     elif 10 < risk_hours <= 20:
@@ -49,7 +49,6 @@ def check_gray_mold_risk(temp_humidity_data: List[Tuple[float, float]], timestam
         return "極高", risk_hours, "red"
 
 # CSVファイルから気温データと相対湿度データを読み込む関数
-# 拡張版：様々なセンサーCSVファイルから気温・湿度データを読み込む関数
 def read_temperature_and_humidity_data(file_obj, device_type=None):
     """
     様々な形式のセンサーデータファイルから温度と湿度のデータを読み込む関数
@@ -67,143 +66,6 @@ def read_temperature_and_humidity_data(file_obj, device_type=None):
     tuple
         (temperature_list, humidity_list, timestamps)
     """
-    # 内部ユーティリティ関数
-    def try_multiple_encodings(file_path):
-        """複数のエンコーディングを試してCSVファイルを読み込む関数"""
-        encodings = ['shift-jis', 'utf-8', 'utf-8-sig']
-        
-        for encoding in encodings:
-            try:
-                st.info(f"エンコーディング {encoding} で読み込み試行中...")
-                df = pd.read_csv(file_path, encoding=encoding)
-                st.success(f"エンコーディング {encoding} で読み込み成功")
-                st.info(f"列名一覧: {df.columns.tolist()}")
-                return df, encoding
-            except Exception as e:
-                st.info(f"エンコーディング {encoding} での読み込み失敗: {str(e)}")
-                continue
-        
-        st.error("すべてのエンコーディングでの読み込みに失敗しました")
-        return None, None
-
-    def combine_date_time(df, date_col='日付', time_col='時刻'):
-        """日付列と時刻列を結合してdatetime型の列を作成する関数"""
-        try:
-            st.info("日付と時刻の列を変換しています")
-            
-            # 時刻列のクリーニング（*を削除）
-            if time_col in df.columns:
-                st.info("時刻列を前処理しています")
-                st.info(f"時刻の最初の5件: {df[time_col].head().tolist()}")
-                df[time_col] = df[time_col].astype(str).str.replace('*', '', regex=False)
-                df[time_col] = df[time_col].str.strip()
-                st.info(f"処理後の時刻列サンプル: {df[time_col].head().tolist()}")
-            
-            # データ型を確認
-            st.info(f"日付列のデータ型: {df[date_col].dtype}")
-            st.info(f"時刻列のデータ型: {df[time_col].dtype}")
-            
-            # 行ごとに日時を変換
-            dates = []
-            for idx, row in df.iterrows():
-                try:
-                    date_str = str(row[date_col]).strip()
-                    time_str = str(row[time_col]).strip()
-                    
-                    # 時刻が数字だけの場合は ":00" を追加
-                    if time_str.isdigit() and len(time_str) <= 2:
-                        time_str = f"{time_str}:00"
-                    
-                    # 日付と時刻を結合
-                    date_time_str = f"{date_str} {time_str}"
-                    
-                    # datetimeに変換
-                    date_time = pd.to_datetime(date_time_str, errors='coerce')
-                    dates.append(date_time)
-                    
-                    # デバッグ用（最初の10行のみ）
-                    if idx < 10:
-                        st.info(f"行 {idx}: '{date_str}' + '{time_str}' => {date_time}")
-                        
-                except Exception as e:
-                    st.info(f"行 {idx} の日時変換エラー: {str(e)}")
-                    dates.append(pd.NaT)  # 変換できない場合はNaN値を追加
-            
-            # 新しい日時列を作成
-            return pd.Series(dates)
-            
-        except Exception as e:
-            st.error(f"日付と時刻の結合に失敗: {str(e)}")
-            import traceback
-            st.text(traceback.format_exc())
-            return pd.Series([pd.NaT] * len(df))
-
-    def convert_to_numeric(df, columns):
-        """指定された列を数値型に変換する関数"""
-        for col in columns:
-            try:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-                st.info(f"{col}を数値型に変換しました。NaN値の数: {df[col].isna().sum()}")
-            except Exception as e:
-                st.error(f"{col}の数値変換エラー: {str(e)}")
-        
-        return df
-
-    def resample_to_hourly(df):
-        """データを1時間間隔にリサンプリングする関数"""
-        try:
-            # インデックスがdatetimeかチェック
-            if not isinstance(df.index, pd.DatetimeIndex):
-                st.error("データフレームのインデックスがdatetime型ではありません")
-                raise ValueError("日時データの変換に失敗しました")
-            
-            # 1時間間隔にリサンプリング
-            df.index = df.index.floor('H')
-            st.info(f"時間切り捨て後のインデックスサンプル: {df.index[:5].tolist()}")
-            
-            # ここが重要: 数値型の列のみを抽出してグループ化処理を行う
-            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-            st.info(f"数値型の列: {numeric_cols}")
-            
-            # 非数値列があれば警告を表示
-            non_numeric_cols = df.select_dtypes(exclude=['number']).columns.tolist()
-            if non_numeric_cols:
-                st.warning(f"非数値型の列は除外されます: {non_numeric_cols}")
-            
-            if numeric_cols:
-                # 数値列のみを使用してグループバイを実行
-                df_hourly = df[numeric_cols].groupby(df.index).mean()
-                st.success("グループバイ処理が成功しました")
-            else:
-                st.warning("数値型の列が見つからないため、処理を続行できません")
-                return df
-            
-            # 欠損値の補間
-            df_resampled = df_hourly.resample('1H').interpolate()
-            st.info(f"補間後のデータ形状: {df_resampled.shape}")
-            
-            return df_resampled
-        
-        except Exception as e:
-            st.error(f"リサンプリングエラー: {str(e)}")
-            import traceback
-            st.text(traceback.format_exc())
-            
-            # エラー時の代替処理
-            try:
-                st.warning("代替処理を試みます: 数値型の列のみを使用")
-                numeric_df = df.select_dtypes(include=['number'])
-                if not numeric_df.empty:
-                    numeric_df.index = df.index
-                    numeric_hourly = numeric_df.groupby(numeric_df.index).mean()
-                    return numeric_hourly.resample('1H').interpolate()
-                else:
-                    st.error("数値型の列が見つかりません")
-                    return df
-            except Exception as e2:
-                st.error(f"代替処理でもエラーが発生: {str(e2)}")
-                return df
-
     # メイン処理開始
     temp_path = None
     try:
@@ -419,7 +281,6 @@ def read_temperature_and_humidity_data(file_obj, device_type=None):
             except Exception as e:
                 st.warning(f"一時ファイル削除エラー: {str(e)}")
 
-
 def try_multiple_encodings(file_path):
     """複数のエンコーディングを試してCSVファイルを読み込む関数"""
     encodings = ['shift-jis', 'utf-8', 'utf-8-sig']
@@ -509,14 +370,24 @@ def resample_to_hourly(df):
             st.error("データフレームのインデックスがdatetime型ではありません")
             raise ValueError("日時データの変換に失敗しました")
         
-        # 1時間間隔にリサンプリング
+        # 1時間間隔にリサンプリング (より単純なアプローチを採用)
+        st.info("1時間間隔へのリサンプリングを実行中...")
+        # まずインデックスを時間単位に切り捨て
         df.index = df.index.floor('H')
+        st.info(f"インデックス切り捨て後のサンプル: {df.index[:5].tolist() if len(df) > 0 else []}")
+        
+        # 同じ時間帯のデータをグループ化して平均値を計算
         df_hourly = df.groupby(df.index).mean()
         st.info(f"時間集計後のデータ形状: {df_hourly.shape}")
         
-        # 欠損値の補間
-        df_resampled = df_hourly.resample('1H').interpolate()
+        # 欠損値の補間 (時系列データに適したmethod='time'を使用)
+        df_resampled = df_hourly.resample('1H').interpolate(method='time')
         st.info(f"補間後のデータ形状: {df_resampled.shape}")
+        
+        # デバッグ情報を追加
+        if not df_resampled.empty:
+            st.info(f"リサンプリング後のインデックス範囲: {df_resampled.index.min()} から {df_resampled.index.max()}")
+            st.info(f"リサンプリング後のデータサンプル: \n{df_resampled.head(3)}")
         
         return df_resampled
     
@@ -525,7 +396,6 @@ def resample_to_hourly(df):
         import traceback
         st.text(traceback.format_exc())
         return df
-
 
 # 時系列リスク計算関数
 def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=28):
@@ -792,24 +662,86 @@ def detect_device_type(file_path):
     print("警告: デバイスタイプを自動検出できません。PFとして処理を試みます。")
     return 'PF'
 
-def resample_to_hourly(df):
-    """データを1時間間隔にリサンプリング"""
-    try:
-        # インデックスがdatetimeかチェック
-        if not isinstance(df.index, pd.DatetimeIndex):
-            raise ValueError("データフレームのインデックスがdatetime型ではありません")
-        
-        # 1時間間隔にリサンプリング（平均値を使用）
-        df_resampled = df.resample('1H').mean()
-        
-        # 欠損値の補間
-        df_resampled = df_resampled.interpolate(method='time')
-        
-        return df_resampled
+# ヒートマップ表示関数（新しい時系列表示オプション）
+def plot_risk_heatmap(risk_df):
+    """リスクをカレンダー形式のヒートマップで表示する関数"""
+    fig, ax = plt.subplots(figsize=(14, 6))  # 28日分表示するためサイズを少し大きく
     
-    except Exception as e:
-        print(f"リサンプリングエラー: {str(e)}")
-        return df
+    # 日付を古い順にソートし、月-日形式に変換
+    risk_df = risk_df.sort_values('date')
+    date_labels = [d.strftime('%m/%d') for d in risk_df['date']]
+    
+    # カラーマップの設定（青→緑→オレンジ→赤）
+    from matplotlib.colors import LinearSegmentedColormap
+    colors = [(0.0, 0.0, 0.8),  # 青（極低・低リスク）
+              (0.0, 0.8, 0.0),  # 緑（中リスク）
+              (1.0, 0.5, 0.0),  # オレンジ（高リスク）
+              (0.8, 0.0, 0.0)]  # 赤（極高リスク）
+    
+    risk_cmap = LinearSegmentedColormap.from_list('risk_cmap', colors)
+    norm = plt.Normalize(0, 40)  # 0-40時間の範囲
+    
+    # リスク時間数を2D配列に変換（1行×日数列のマトリックス）
+    risk_matrix = risk_df['risk_hours'].values.reshape(1, -1)
+    
+    # ヒートマップの描画
+    heatmap = ax.pcolormesh(risk_matrix, cmap=risk_cmap, norm=norm, edgecolors='white', linewidth=1)
+    
+    # カラーバーの追加
+    cbar = plt.colorbar(heatmap, ax=ax, orientation='vertical', pad=0.01)
+    cbar.set_label('条件を満たす時間数')
+    
+    # Y軸ラベルの設定（空にする）
+    ax.set_yticks([])
+    
+    # X軸に日付ラベルを設定（4日ごとに表示）
+    total_days = len(date_labels)
+    # すべてのX位置を計算
+    xtick_positions = np.arange(len(date_labels)) + 0.5
+    
+    # 表示間隔を計算（合計日数に応じて調整）
+    if total_days > 20:
+        step = 4  # 28日なら4日ごと（約7ラベル）
+    else:
+        step = 2  # 少ない日数なら2日ごと
+    
+    # 間引いたインデックスとラベルを設定
+    xtick_indices = range(0, total_days, step)
+    ax.set_xticks([xtick_positions[i] for i in xtick_indices])
+    ax.set_xticklabels([date_labels[i] for i in xtick_indices], rotation=45, ha='right')
+    
+    # すべての日の位置に薄い縦線を追加（日付の区切りを示す）
+    for x in xtick_positions:
+        ax.axvline(x, color='lightgray', linestyle='-', linewidth=0.5, alpha=0.3)
+    
+    # リスクレベルマーカーの追加（各セルの上）
+    for i, row in enumerate(risk_df.itertuples()):
+        level_marker = {
+            '極低': 'o',   # 円形
+            '低': '^',     # 三角形
+            '中': 's',     # 四角形
+            '高': 'D',     # ダイヤモンド
+            '極高': '*'    # 星形
+        }
+        marker = level_marker.get(row.risk_level, '')
+        ax.text(i + 0.5, 0.5, marker, ha='center', va='center', fontsize=15)
+    
+    # タイトル
+    ax.set_title('過去28日間の灰色かび病リスク（ヒートマップ）')
+    
+    # 凡例
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='k', markersize=10, label='極低'),
+        Line2D([0], [0], marker='^', color='w', markerfacecolor='k', markersize=10, label='低'),
+        Line2D([0], [0], marker='s', color='w', markerfacecolor='k', markersize=10, label='中'),
+        Line2D([0], [0], marker='D', color='w', markerfacecolor='k', markersize=10, label='高'),
+        Line2D([0], [0], marker='*', color='w', markerfacecolor='k', markersize=10, label='極高')
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', framealpha=0.7)
+    
+    plt.tight_layout()
+    return fig
 
 def main():
     st.set_page_config(page_title="イチゴ灰色かび病リスク計算", layout="wide")
@@ -929,87 +861,6 @@ def main():
                     st.dataframe(display_df)
             else:
                 st.warning("表示可能な時系列データがありません。より長期間のデータを含むCSVファイルをアップロードしてください。")
-
-# ヒートマップ表示関数（新しい時系列表示オプション）
-def plot_risk_heatmap(risk_df):
-    """リスクをカレンダー形式のヒートマップで表示する関数"""
-    fig, ax = plt.subplots(figsize=(14, 6))  # 28日分表示するためサイズを少し大きく
-    
-    # 日付を古い順にソートし、月-日形式に変換
-    risk_df = risk_df.sort_values('date')
-    date_labels = [d.strftime('%m/%d') for d in risk_df['date']]
-    
-    # カラーマップの設定（青→緑→オレンジ→赤）
-    from matplotlib.colors import LinearSegmentedColormap
-    colors = [(0.0, 0.0, 0.8),  # 青（極低・低リスク）
-              (0.0, 0.8, 0.0),  # 緑（中リスク）
-              (1.0, 0.5, 0.0),  # オレンジ（高リスク）
-              (0.8, 0.0, 0.0)]  # 赤（極高リスク）
-    
-    risk_cmap = LinearSegmentedColormap.from_list('risk_cmap', colors)
-    norm = plt.Normalize(0, 40)  # 0-40時間の範囲
-    
-    # リスク時間数を2D配列に変換（1行×日数列のマトリックス）
-    risk_matrix = risk_df['risk_hours'].values.reshape(1, -1)
-    
-    # ヒートマップの描画
-    heatmap = ax.pcolormesh(risk_matrix, cmap=risk_cmap, norm=norm, edgecolors='white', linewidth=1)
-    
-    # カラーバーの追加
-    cbar = plt.colorbar(heatmap, ax=ax, orientation='vertical', pad=0.01)
-    cbar.set_label('条件を満たす時間数')
-    
-    # Y軸ラベルの設定（空にする）
-    ax.set_yticks([])
-    
-    # X軸に日付ラベルを設定（4日ごとに表示）
-    total_days = len(date_labels)
-    # すべてのX位置を計算
-    xtick_positions = np.arange(len(date_labels)) + 0.5
-    
-    # 表示間隔を計算（合計日数に応じて調整）
-    if total_days > 20:
-        step = 4  # 28日なら4日ごと（約7ラベル）
-    else:
-        step = 2  # 少ない日数なら2日ごと
-    
-    # 間引いたインデックスとラベルを設定
-    xtick_indices = range(0, total_days, step)
-    ax.set_xticks([xtick_positions[i] for i in xtick_indices])
-    ax.set_xticklabels([date_labels[i] for i in xtick_indices], rotation=45, ha='right')
-    
-    # すべての日の位置に薄い縦線を追加（日付の区切りを示す）
-    for x in xtick_positions:
-        ax.axvline(x, color='lightgray', linestyle='-', linewidth=0.5, alpha=0.3)
-    
-    # リスクレベルマーカーの追加（各セルの上）
-    for i, row in enumerate(risk_df.itertuples()):
-        level_marker = {
-            '極低': 'o',   # 円形
-            '低': '^',     # 三角形
-            '中': 's',     # 四角形
-            '高': 'D',     # ダイヤモンド
-            '極高': '*'    # 星形
-        }
-        marker = level_marker.get(row.risk_level, '')
-        ax.text(i + 0.5, 0.5, marker, ha='center', va='center', fontsize=15)
-    
-    # タイトル
-    ax.set_title('過去28日間の灰色かび病リスク（ヒートマップ）')
-    
-    # 凡例
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Line2D([0], [0], marker='o', color='w', markerfacecolor='k', markersize=10, label='極低'),
-        Line2D([0], [0], marker='^', color='w', markerfacecolor='k', markersize=10, label='低'),
-        Line2D([0], [0], marker='s', color='w', markerfacecolor='k', markersize=10, label='中'),
-        Line2D([0], [0], marker='D', color='w', markerfacecolor='k', markersize=10, label='高'),
-        Line2D([0], [0], marker='*', color='w', markerfacecolor='k', markersize=10, label='極高')
-    ]
-    ax.legend(handles=legend_elements, loc='upper right', framealpha=0.7)
-    
-    plt.tight_layout()
-    return fig
 
 if __name__ == "__main__":
     main()
