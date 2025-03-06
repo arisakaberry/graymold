@@ -241,10 +241,10 @@ def read_temperature_and_humidity_data(file_obj, device_type=None):
                 'date_time_cols': {'date_col': '日付', 'time_col': '時刻'}
             },
             'SB': {
-                'temp_cols': ['Temperature_Celsius(°C)', 'Temperature_Celsius(℃)'],
+                'temp_cols': ['Temperature_Celsius(°C)', 'Temperature_Celsius(℃)', 'Temperature_Celsius(ﾂｰC)'],  # 文字化けパターンを追加
                 'humid_cols': ['Relative_Humidity(%)'],
                 'timestamp_cols': ['Timestamp', 'Date'],
-                'encoding': 'utf-8'
+                'encoding': 'utf-8'  # エンコーディングを指定
             },
             'OT': {
                 'temp_cols': ['室温'],
@@ -318,6 +318,16 @@ def read_temperature_and_humidity_data(file_obj, device_type=None):
             
             df = df.set_index('datetime')
             timestamp_found = True
+            
+        if device_type == 'SB':
+            try:
+                # SwitchBotファイルはUTF-8で強制的に読み直し
+                st.info("SwitchBotファイルをUTF-8で読み込み直します")
+                df = pd.read_csv(temp_path, encoding='utf-8')
+                st.success("UTF-8での読み込みに成功しました")
+                st.info(f"正しく読み込まれた列名: {df.columns.tolist()}")
+            except Exception as e:
+                st.warning(f"UTF-8での読み込みに失敗しました: {str(e)}")
         
         # 一般的なタイムスタンプ列の処理
         if not timestamp_found:
