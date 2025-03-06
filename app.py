@@ -414,9 +414,9 @@ def resample_to_hourly(df):
         import traceback
         st.text(traceback.format_exc())
         return df
-    
+
 # 時系列リスク計算関数
-def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=28):
+def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=30):
     """
     過去X日間の各日におけるリスクを計算する関数
     各日付から遡って10日間(240時間)のウィンドウでリスク判定
@@ -515,7 +515,7 @@ def plot_risk_bar_chart(risk_df):
     ax.set_ylabel('条件を満たす時間数')
     ax.set_ylim(0, max(40, risk_df['risk_hours'].max() * 1.1))  # 最大値よりも少し大きめに
     
-    ax.set_title('過去14日間の灰色かび病リスク推移')
+    ax.set_title('過去10日間の灰色かび病リスク推移')
     
     # リスクレベルの凡例を更新
     from matplotlib.patches import Patch
@@ -683,7 +683,7 @@ def detect_device_type(file_path):
 # ヒートマップ表示関数（新しい時系列表示オプション）
 def plot_risk_heatmap(risk_df):
     """リスクをカレンダー形式のヒートマップで表示する関数"""
-    fig, ax = plt.subplots(figsize=(14, 6))  # 28日分表示するためサイズを少し大きく
+    fig, ax = plt.subplots(figsize=(14, 3))
     
     # 日付を古い順にソートし、月-日形式に変換
     risk_df = risk_df.sort_values('date')
@@ -732,31 +732,8 @@ def plot_risk_heatmap(risk_df):
     for x in xtick_positions:
         ax.axvline(x, color='lightgray', linestyle='-', linewidth=0.5, alpha=0.3)
     
-    # リスクレベルマーカーの追加（各セルの上）
-    for i, row in enumerate(risk_df.itertuples()):
-        level_marker = {
-            '極低': 'o',   # 円形
-            '低': '^',     # 三角形
-            '中': 's',     # 四角形
-            '高': 'D',     # ダイヤモンド
-            '極高': '*'    # 星形
-        }
-        marker = level_marker.get(row.risk_level, '')
-        ax.text(i + 0.5, 0.5, marker, ha='center', va='center', fontsize=15)
-    
     # タイトル
-    ax.set_title('過去28日間の灰色かび病リスク（ヒートマップ）')
-    
-    # 凡例
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Line2D([0], [0], marker='o', color='w', markerfacecolor='k', markersize=10, label='極低'),
-        Line2D([0], [0], marker='^', color='w', markerfacecolor='k', markersize=10, label='低'),
-        Line2D([0], [0], marker='s', color='w', markerfacecolor='k', markersize=10, label='中'),
-        Line2D([0], [0], marker='D', color='w', markerfacecolor='k', markersize=10, label='高'),
-        Line2D([0], [0], marker='*', color='w', markerfacecolor='k', markersize=10, label='極高')
-    ]
-    ax.legend(handles=legend_elements, loc='upper right', framealpha=0.7)
+    ax.set_title('過去30日間の灰色かび病リスク（ヒートマップ）')
     
     plt.tight_layout()
     return fig
@@ -850,18 +827,18 @@ def main():
             
             # 2. 時系列リスクの棒グラフ表示
             if not time_series_risk_df.empty:
-                st.header("過去14日間の灰色かび病リスク推移（棒グラフ）")
+                st.header("過去10日間の灰色かび病リスク推移（棒グラフ）")
                 
                 # 棒グラフ用に直近14日間のデータを抽出
-                recent_14_days = time_series_risk_df.sort_values('date', ascending=False).head(14).sort_values('date')
-                bar_fig = plot_risk_bar_chart(recent_14_days)
+                recent_10_days = time_series_risk_df.sort_values('date', ascending=False).head(10).sort_values('date')
+                bar_fig = plot_risk_bar_chart(recent_10_days)
                 st.pyplot(bar_fig)
                 
                 # 区切り線を表示
                 st.markdown("---")
                 
                 # 3. 時系列リスクのヒートマップ表示（28日間）
-                st.header("過去28日間の灰色かび病リスク推移（ヒートマップ）")
+                st.header("過去30日間の灰色かび病リスク推移（ヒートマップ）")
                 heat_fig = plot_risk_heatmap(time_series_risk_df)
                 st.pyplot(heat_fig)
                 
