@@ -72,10 +72,8 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
             with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
                 tmp_file.write(file_obj.getbuffer())
                 temp_path = tmp_file.name
-            st.info(f"一時ファイルを作成しました: {temp_path}")
         else:  # 文字列（ファイルパス）の場合
             temp_path = file_obj
-            st.info(f"ファイルパスを使用します: {temp_path}")
         
         # デバイス設定の定義（辞書を活用）
         # 各デバイスタイプに対応する列名とパラメータを集約
@@ -121,13 +119,11 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
         
         # デバイスタイプの自動検出を試みる（デバイスタイプが未指定の場合）
         if device_type is None:
-            st.info("デバイスタイプの自動検出を試みます...")
             
             # ファイルを読み込んでヘッダーを確認
             df, encoding = try_multiple_encodings(temp_path)
             if df is not None:
                 cols = df.columns.tolist()
-                st.info(f"検出された列名: {cols}")
                 
                 # 各デバイスタイプの特徴と照合
                 for dev, config in device_configs.items():
@@ -135,7 +131,6 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
                     for col_name in config['temp_cols']:
                         if col_name in cols:
                             device_type = dev
-                            st.success(f"{dev}形式のファイルを検出しました (列名: {col_name})")
                             break
                     if device_type:
                         break
@@ -143,9 +138,6 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
             # 自動検出できない場合はデフォルトとしてSBを使用
             if device_type is None:
                 device_type = 'SB'
-                st.warning("ファイル形式を自動検出できませんでした。SwitchBot形式として処理します。")
-        
-        st.info(f"{device_type}形式として処理します")
         
         # 設定を取得
         config = device_configs.get(device_type, device_configs['SB'])
@@ -161,8 +153,7 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
         
         # PF2形式の特別処理（日付と時刻が別々の列）
         if device_type == 'PF2' and '日付' in df.columns and '時刻' in df.columns:
-            st.info("PF2形式として日付と時刻の列を処理します")
-            
+     
             # 時刻列からアスタリスクなどを削除して結合
             date_col = config.get('date_time_cols', {}).get('date_col', '日付')
             time_col = config.get('date_time_cols', {}).get('time_col', '時刻')
@@ -172,7 +163,6 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
             # NaT値をチェック
             nat_count = df['datetime'].isna().sum()
             if nat_count > 0:
-                st.warning(f"{nat_count} 行の日時データが無効なため除外されます")
                 df = df.dropna(subset=['datetime'])
             
             df = df.set_index('datetime')
@@ -181,10 +171,7 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
         if device_type == 'SB':
             try:
                 # SwitchBotファイルはUTF-8で強制的に読み直し
-                st.info("SwitchBotファイルをUTF-8で読み込み直します")
                 df = pd.read_csv(temp_path, encoding='utf-8')
-                st.success("UTF-8での読み込みに成功しました")
-                st.info(f"正しく読み込まれた列名: {df.columns.tolist()}")
             except Exception as e:
                 st.warning(f"UTF-8での読み込みに失敗しました: {str(e)}")
         
@@ -192,7 +179,6 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
         if not timestamp_found:
             for ts_col in config['timestamp_cols']:
                 if ts_col in df.columns:
-                    st.info(f"タイムスタンプ列を特定しました: {ts_col}")
                     
                     # タイムスタンプをdatetime型に変換
                     df['datetime'] = pd.to_datetime(df[ts_col], errors='coerce')
@@ -200,7 +186,6 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
                     # NaT値をチェック
                     nat_count = df['datetime'].isna().sum()
                     if nat_count > 0:
-                        st.warning(f"{nat_count} 行の日時データが無効なため除外されます")
                         df = df.dropna(subset=['datetime'])
                     
                     df = df.set_index('datetime')
@@ -210,13 +195,11 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
         if not timestamp_found:
             # 日付と時刻が別々の列の場合（一般的なケース）
             if '日付' in df.columns and '時刻' in df.columns:
-                st.info("日付と時刻の列を検出しました")
                 df['datetime'] = combine_date_time(df, '日付', '時刻')
                 
                 # NaT値をチェック
                 nat_count = df['datetime'].isna().sum()
                 if nat_count > 0:
-                    st.warning(f"{nat_count} 行の日時データが無効なため除外されます")
                     df = df.dropna(subset=['datetime'])
                 
                 df = df.set_index('datetime')
@@ -234,10 +217,7 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
                 cutoff_date = latest_date - pd.Timedelta(days=days_to_keep)
                 # 期間内のデータのみ保持
                 df_filtered = df[df.index >= cutoff_date]
-                
-                st.info(f"読み込んだ全期間: {df.index.min()} から {latest_date} ({len(df)}行)")
-                st.info(f"フィルタ後の期間: {df_filtered.index.min() if not df_filtered.empty else 'なし'} から {df_filtered.index.max() if not df_filtered.empty else 'なし'} ({len(df_filtered)}行)")
-                
+
                 # フィルタ後にデータが残っていることを確認
                 if not df_filtered.empty:
                     # 元のデータフレームを更新
@@ -251,14 +231,12 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
         for col in config['temp_cols']:
             if col in df.columns:
                 temp_col = col
-                st.info(f"温度列を特定しました: {temp_col}")
                 break
         
         humid_col = None
         for col in config['humid_cols']:
             if col in df.columns:
                 humid_col = col
-                st.info(f"湿度列を特定しました: {humid_col}")
                 break
         
         if temp_col is None or humid_col is None:
@@ -294,7 +272,6 @@ def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=
                 import os
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
-                    st.info("一時ファイルを削除しました")
             except Exception as e:
                 st.warning(f"一時ファイル削除エラー: {str(e)}")
 
@@ -304,10 +281,7 @@ def try_multiple_encodings(file_path):
     
     for encoding in encodings:
         try:
-            st.info(f"エンコーディング {encoding} で読み込み試行中...")
             df = pd.read_csv(file_path, encoding=encoding)
-            st.success(f"エンコーディング {encoding} で読み込み成功")
-            st.info(f"列名一覧: {df.columns.tolist()}")
             return df, encoding
         except Exception as e:
             st.info(f"エンコーディング {encoding} での読み込み失敗: {str(e)}")
@@ -323,16 +297,9 @@ def combine_date_time(df, date_col='日付', time_col='時刻'):
         
         # 時刻列のクリーニング（*を削除）
         if time_col in df.columns:
-            st.info("時刻列を前処理しています")
-            st.info(f"時刻の最初の5件: {df[time_col].head().tolist()}")
             df[time_col] = df[time_col].astype(str).str.replace('*', '', regex=False)
             df[time_col] = df[time_col].str.strip()
-            st.info(f"処理後の時刻列サンプル: {df[time_col].head().tolist()}")
-        
-        # データ型を確認
-        st.info(f"日付列のデータ型: {df[date_col].dtype}")
-        st.info(f"時刻列のデータ型: {df[time_col].dtype}")
-        
+
         # 行ごとに日時を変換
         dates = []
         for idx, row in df.iterrows():
@@ -373,7 +340,6 @@ def convert_to_numeric(df, columns):
     for col in columns:
         try:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-            st.info(f"{col}を数値型に変換しました。NaN値の数: {df[col].isna().sum()}")
         except Exception as e:
             st.error(f"{col}の数値変換エラー: {str(e)}")
     
@@ -386,14 +352,9 @@ def resample_to_hourly(df):
         if not isinstance(df.index, pd.DatetimeIndex):
             st.error("データフレームのインデックスがdatetime型ではありません")
             raise ValueError("日時データの変換に失敗しました")
-        
-        # データ型を確認
-        st.info(f"リサンプリング前のデータ形状: {df.shape}")
-        st.info(f"列の型情報: {df.dtypes}")
-        
+
         # 非数値列を除外
         numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-        st.info(f"数値型の列: {numeric_cols}")
         
         if not numeric_cols:
             st.error("数値型の列が見つかりません")
@@ -403,26 +364,17 @@ def resample_to_hourly(df):
         numeric_df = df[numeric_cols].copy()
         
         # 1時間間隔にリサンプリング
-        st.info("1時間間隔へのリサンプリングを実行中...")
         numeric_df.index = numeric_df.index.floor('H')
         
         # デバッグ情報
         sample_idx = numeric_df.index[:5].tolist() if len(numeric_df) > 0 else []
-        st.info(f"インデックス切り捨て後のサンプル: {sample_idx}")
         
         # この時点でインデックスは時間単位に切り捨てられています
         # グループ化とリサンプリング
         df_hourly = numeric_df.groupby(numeric_df.index).mean()
-        st.info(f"時間集計後のデータ形状: {df_hourly.shape}")
         
         # 欠損値の補間 (時系列データに適した method='time' を使用)
         df_resampled = df_hourly.resample('1H').interpolate(method='time')
-        st.info(f"補間後のデータ形状: {df_resampled.shape}")
-        
-        # デバッグ情報
-        if not df_resampled.empty:
-            st.info(f"リサンプリング後のインデックス範囲: {df_resampled.index.min()} から {df_resampled.index.max()}")
-            st.info(f"リサンプリング後のデータサンプル: \n{df_resampled.head(3)}")
         
         return df_resampled
     
@@ -859,7 +811,7 @@ def main():
     }
     
     # ファイルアップローダー
-    uploaded_file = st.file_uploader("CSVファイルを選択してください", type=["csv", "xlsx", "xls"])
+    uploaded_file = st.file_uploader("CSVファイルを選択してください。", type=["csv", "xlsx", "xls"])
 
     if uploaded_file is not None:
         # 選択されたデバイスタイプを取得
@@ -874,16 +826,6 @@ def main():
 
         if temperature is not None and relative_humidity is not None:
             # データのプレビューを表示
-            preview_df = pd.DataFrame({
-                '日時': timestamps[:5],
-                '温度': temperature[:5],
-                '湿度': relative_humidity[:5]
-            })
-            st.write("データプレビュー（最初の5行）:")
-            st.dataframe(preview_df)
-            
-            st.write(f"読み込まれたデータポイント数: {len(temperature)}")
-            st.write(f"期間: {min(timestamps)} から {max(timestamps)}")
             
             # 温度・湿度データをリスト化
             temp_humidity_data = list(zip(temperature, relative_humidity))
@@ -896,11 +838,11 @@ def main():
 
             # 1. メインの現在リスク表示（スピードメーター）
             st.header("現在の灰色かび病リスク")
-            st.write("（最新日から10日間さかのぼったデータに基づく計算）")
+            st.markdown("<p style='color:gray; font-size:14px;'>（最新日から10日間さかのぼったデータに基づく計算）</p>", unsafe_allow_html=True)   
             
             # リスクレベル表示
             st.markdown(f"<h3 style='color: {current_color};'>灰色かび病の発病リスク: {current_risk_level}</h3>", unsafe_allow_html=True)
-            st.write(f"条件を満たす時間数: {current_risk_hours}時間")
+            st.markdown(f"<p style='font-size:18px; font-weight:bold;'>条件を満たす時間数: {current_risk_hours}時間</p>", unsafe_allow_html=True)
 
             # 推奨対策表示
             recommendations = {
@@ -910,9 +852,7 @@ def main():
                 "高": "耕種的防除と薬剤防除の実施が必要です。",
                 "極高": "今すぐに耕種的防除と薬剤防除の実施が必要です。"
             }
-            st.write(f"推奨対策: {recommendations[current_risk_level]}")
-            st.write(f"データ総数: {len(temp_humidity_data)}時間分")
-
+            st.markdown(f"<p style='font-size:16px;'><span style='font-weight:bold;'>推奨対策:</span> {recommendations[current_risk_level]}</p>", unsafe_allow_html=True)
             # スピードメーターを表示
             risk_viz_fig = display_risk_visualization(current_risk_level, current_risk_hours)
             st.pyplot(risk_viz_fig)
