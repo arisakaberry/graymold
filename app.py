@@ -503,8 +503,8 @@ def plot_speedometer(percentage, color, risk_level, risk_hours):
     labels = ["極低", "低", "中", "高", "極高"]
     angles = np.linspace(180, 0, 5) * np.pi / 180.0
     for label, angle in zip(labels, angles):
-        x = 1.05 * np.cos(angle)
-        y = 1.05 * np.sin(angle)
+        x = 1.1 * np.cos(angle)
+        y = 1.1 * np.sin(angle)
         ax.text(x, y, label, ha='center', va='center', fontsize=18)
     
     # スケール表示（時間数）
@@ -512,16 +512,13 @@ def plot_speedometer(percentage, color, risk_level, risk_hours):
     for scale, angle in zip(scales, angles):
         x = 0.81 * np.cos(angle)
         y = 0.81 * np.sin(angle)
-        ax.text(x, y, scale, ha='center', va='center', fontsize=18, color='gray')
+        ax.text(x, y, scale, ha='center', va='center', fontsize=16, color='black')
     
     # グラフの設定
     ax.set_xlim(-1.2, 1.2)
     ax.set_ylim(-0.8, 1.2)
     ax.set_aspect('equal')
     ax.axis('off')
-    
-    # 全体に微妙な影を追加
-    fig.patch.set_alpha(0.0)  # 透明な背景
     
     return fig
 
@@ -668,7 +665,7 @@ def plot_risk_bar_chart(risk_df):
         # 時間数を棒の上に表示
         ax.text(bar.get_x() + bar.get_width()/2., height + 1,
                 f'{hours}時間',
-                ha='center', va='bottom', fontsize=18, fontweight='bold')
+                ha='center', va='bottom', fontsize=14, fontweight='bold')
     
     # 日付を40時間ラインの上に表示（棒グラフから離して）
     date_y_position = 43  # 40時間ラインより少し上
@@ -702,10 +699,10 @@ def plot_risk_bar_chart(risk_df):
         rect = patches.Rectangle((x, 0.4), box_width, 0.4, facecolor=color)
         ax_legend.add_patch(rect)
         # テキストラベルを追加
-        ax_legend.text(x + box_width/2, 0.15, level, ha='center', va='center', fontsize=10)
+        ax_legend.text(x + box_width/2, 0.15, level, ha='center', va='center', fontsize=16)
     
     # 凡例のタイトル
-    ax_legend.text(0.5, 0.9, "リスクレベル区分", ha='center', va='center', fontsize=10, fontweight='bold')
+    ax_legend.text(0.5, 0.9, "リスクレベル区分", ha='center', va='center', fontsize=16, fontweight='bold')
     
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)  # サブプロット間の隙間を調整
@@ -759,29 +756,7 @@ def plot_risk_heatmap(risk_df):
     
     # 凡例を描画するサブプロットの設定
     ax_legend.axis('off')
-    
-    # リスクレベル区分の定義
-    risk_levels = ["極低 (0時間)", "低 (1-10時間)", "中 (11-20時間)", "高 (21-30時間)", "極高 (31時間以上)"]
-    risk_colors = [colors[0], colors[0], colors[1], colors[2], colors[3]]
-    
-    # 凡例を横に並べて表示（スマホに最適化）
-    box_width = 0.15
-    gap = 0.05
-    total_width = (box_width + gap) * len(risk_levels) - gap
-    start_x = (1 - total_width) / 2
-    
-    # 凡例をさらに下げる
-    for i, (level, color) in enumerate(zip(risk_levels, risk_colors)):
-        x = start_x + i * (box_width + gap)
-        # 色付きのボックスを描画（さらに下に配置）
-        rect = patches.Rectangle((x, -0.2), box_width, 0.4, facecolor=color)
-        ax_legend.add_patch(rect)
-        # テキストラベルを追加（ボックスの下に配置）
-        ax_legend.text(x + box_width/2, -0.5, level, ha='center', va='center', fontsize=16)
-    
-    # 凡例のタイトル（下げる）
-    ax_legend.text(0.5, 0.4, "リスクレベル区分", ha='center', va='center', fontsize=16, fontweight='bold')
-    
+
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.05)
     return fig
