@@ -707,7 +707,7 @@ def plot_risk_bar_chart(risk_df):
     # 最初と最後の日付を取得して期間をタイトルに表示
     first_date = date_labels[0]
     last_date = date_labels[-1]
-    ax.set_title(f'過去10日間の灰色かび病リスク推移\n({first_date}～{last_date})', fontsize=14)
+    ax.set_title(f'過去10日間の灰色かび病リスク推移({first_date}～{last_date})', fontsize=18)
     
     # 各棒の上に時間数を表示
     for i, (bar, hours) in enumerate(zip(bars, risk_df['risk_hours'])):
@@ -715,7 +715,7 @@ def plot_risk_bar_chart(risk_df):
         # 時間数を棒の上に表示
         ax.text(bar.get_x() + bar.get_width()/2., height + 1,
                 f'{hours}時間',
-                ha='center', va='bottom', fontsize=9, fontweight='bold')
+                ha='center', va='bottom', fontsize=10, fontweight='bold')
     
     # 日付を40時間ラインの上に表示（棒グラフから離して）
     date_y_position = 43  # 40時間ラインより少し上
@@ -749,7 +749,7 @@ def plot_risk_bar_chart(risk_df):
         rect = patches.Rectangle((x, 0.4), box_width, 0.4, facecolor=color)
         ax_legend.add_patch(rect)
         # テキストラベルを追加
-        ax_legend.text(x + box_width/2, 0.15, level, ha='center', va='center', fontsize=8)
+        ax_legend.text(x + box_width/2, 0.15, level, ha='center', va='center', fontsize=10)
     
     # 凡例のタイトル
     ax_legend.text(0.5, 0.9, "リスクレベル区分", ha='center', va='center', fontsize=10, fontweight='bold')
@@ -758,11 +758,10 @@ def plot_risk_bar_chart(risk_df):
     plt.subplots_adjust(hspace=0.1)  # サブプロット間の隙間を調整
     return fig
 
-# ヒートマップ表示関数（スマホ向けに最適化）
 def plot_risk_heatmap(risk_df):
     """リスクをカレンダー形式のヒートマップで表示する関数（スマホ対応版）"""
     # スマホ向けにサイズとレイアウトを調整
-    fig, axes = plt.subplots(2, 1, figsize=(8, 4.5), gridspec_kw={'height_ratios': [3, 1]})
+    fig, axes = plt.subplots(2, 1, figsize=(8, 1.8), gridspec_kw={'height_ratios': [1, 0.5]})
     ax = axes[0]  # メインのヒートマップ用
     ax_legend = axes[1]  # 凡例用
     
@@ -797,12 +796,13 @@ def plot_risk_heatmap(risk_df):
     ax.set_xticks([xtick_positions[0], xtick_positions[-1]])
     ax.set_xticklabels([date_labels[0], date_labels[-1]], fontsize=12, fontweight='bold')
     
-    # 日付の区切り線
+    # 日付の区切り線（薄く）
     for x in xtick_positions:
-        ax.axvline(x, color='lightgray', linestyle='-', linewidth=0.5, alpha=0.3)
+        ax.axvline(x, color='lightgray', linestyle='-', linewidth=0.3, alpha=0.2)
+    
     
     # タイトル
-    ax.set_title(f"過去30日間の灰色かび病リスク推移 ({date_labels[0]}～{date_labels[-1]})", fontsize=20)
+    ax.set_title(f"過去30日間の灰色かび病リスク推移 ({date_labels[0]}～{date_labels[-1]})", fontsize=18)
     
     # 凡例を描画するサブプロットの設定
     ax_legend.axis('off')
@@ -817,18 +817,20 @@ def plot_risk_heatmap(risk_df):
     total_width = (box_width + gap) * len(risk_levels) - gap
     start_x = (1 - total_width) / 2
     
+    # 凡例をさらに下げる
     for i, (level, color) in enumerate(zip(risk_levels, risk_colors)):
         x = start_x + i * (box_width + gap)
-        # 色付きのボックスを描画
-        rect = patches.Rectangle((x, 0.4), box_width, 0.4, facecolor=color)
+        # 色付きのボックスを描画（さらに下に配置）
+        rect = patches.Rectangle((x, -0.2), box_width, 0.4, facecolor=color)
         ax_legend.add_patch(rect)
-        # テキストラベルを追加（スマホで読みやすいようにフォントサイズ調整）
-        ax_legend.text(x + box_width/2, 0.15, level, ha='center', va='center', fontsize=8)
+        # テキストラベルを追加（ボックスの下に配置）
+        ax_legend.text(x + box_width/2, -0.5, level, ha='center', va='center', fontsize=10)
     
-    # 凡例のタイトル
-    ax_legend.text(0.5, 0.9, "リスクレベル区分", ha='center', va='center', fontsize=10, fontweight='bold')
+    # 凡例のタイトル（下げる）
+    ax_legend.text(0.5, 0.4, "リスクレベル区分", ha='center', va='center', fontsize=10, fontweight='bold')
     
     plt.tight_layout()
+    plt.subplots_adjust(hspace=0.05)
     return fig
 
 def main():
@@ -920,9 +922,8 @@ def main():
             
             # 2. 時系列リスクの棒グラフ表示
             if not time_series_risk_df.empty:
-                st.header("過去10日間の灰色かび病リスク推移（棒グラフ）")
                 
-                # 棒グラフ用に直近14日間のデータを抽出
+                # 棒グラフ用に直近10日間のデータを抽出
                 recent_10_days = time_series_risk_df.sort_values('date', ascending=False).head(10).sort_values('date')
                 bar_fig = plot_risk_bar_chart(recent_10_days)
                 st.pyplot(bar_fig)
@@ -930,7 +931,7 @@ def main():
                 # 区切り線を表示
                 st.markdown("---")
                 
-                # 3. 時系列リスクのヒートマップ表示（28日間）
+                # 3. 時系列リスクのヒートマップ表示（30日間）
                 heat_fig = plot_risk_heatmap(time_series_risk_df)
                 st.pyplot(heat_fig)
                 
