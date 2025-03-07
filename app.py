@@ -753,7 +753,7 @@ def plot_risk_heatmap(risk_df):
 
 def main():
     st.set_page_config(page_title="イチゴ灰色かび病リスク計算", layout="wide")
-    st.title("イチゴ灰色かび病リスク計算")
+    st.title("イチゴ灰色かび病リスク計算プログラム")
 
 
     st.header("CSVファイルアップロード")
@@ -808,7 +808,7 @@ def main():
             
             # リスクレベル表示
             st.markdown(f"<h3 style='color: {current_color};'>灰色かび病の発病リスク: {current_risk_level}</h3>", unsafe_allow_html=True)
-            st.markdown(f"<p style='font-size:18px; font-weight:bold;'>条件を満たす時間数: {current_risk_hours}時間</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:18px; font-weight:bold;'>過去10日間で条件を満たす時間数: {current_risk_hours}時間</p>", unsafe_allow_html=True)
 
             # 推奨対策表示
             recommendations = {
