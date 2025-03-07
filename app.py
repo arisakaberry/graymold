@@ -528,9 +528,22 @@ def plot_speedometer(percentage, color, risk_level, risk_hours):
     circle = plt.Circle((0, 0), 0.05, color='darkgray')
     ax.add_patch(circle)
     
-    # リスクレベルとリスク時間のテキスト表示
-    ax.text(0, -0.4, f"リスクレベル: {risk_level}", ha='center', va='center', fontsize=15, fontweight='bold', color=color)
-    ax.text(0, -0.55, f"{risk_hours}時間", ha='center', va='center', fontsize=14)
+    # リスクレベルを装飾ボックスで表示
+    text_box_props = dict(
+        boxstyle='round,pad=0.5',
+        facecolor=color,
+        alpha=0.8,
+        edgecolor='none'
+    )
+    
+    # リスクレベルテキスト - 白い文字で目立たせる
+    ax.text(0, -0.4, f"リスクレベル: {risk_level}", ha='center', va='center', 
+            fontsize=16, fontweight='bold', color='white',
+            bbox=text_box_props)
+    
+    # リスク時間のテキスト
+    ax.text(0, -0.6, f"{risk_hours}時間", ha='center', va='center', 
+            fontsize=14, color='#303030')
     
     # 目盛り表示
     labels = ["極低", "低", "中", "高", "極高"]
@@ -543,15 +556,18 @@ def plot_speedometer(percentage, color, risk_level, risk_hours):
     # スケール表示（時間数）
     scales = ["0", "10", "20", "30", "40+"]
     for scale, angle in zip(scales, angles):
-        x = 0.85 * np.cos(angle)
-        y = 0.85 * np.sin(angle)
+        x = 0.81 * np.cos(angle)
+        y = 0.81 * np.sin(angle)
         ax.text(x, y, scale, ha='center', va='center', fontsize=8, color='gray')
     
     # グラフの設定
     ax.set_xlim(-1.2, 1.2)
-    ax.set_ylim(-0.7, 1.2)
+    ax.set_ylim(-0.8, 1.2)
     ax.set_aspect('equal')
     ax.axis('off')
+    
+    # 全体に微妙な影を追加
+    fig.patch.set_alpha(0.0)  # 透明な背景
     
     return fig
 
@@ -638,8 +654,11 @@ def detect_device_type(file_path):
 
 # 棒グラフ描画関数
 def plot_risk_bar_chart(risk_df):
-    """過去の日別リスクを棒グラフで表示する関数"""
-    fig, ax = plt.subplots(figsize=(12, 6))
+    """過去の日別リスクを棒グラフで表示する関数（スマホ対応版、日付を上部に配置）"""
+    # スマホに適したサイズ比率
+    fig, axes = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={'height_ratios': [4, 1]})
+    ax = axes[0]  # メインの棒グラフ用
+    ax_legend = axes[1]  # 凡例用
     
     # 日付を古い順にソート
     risk_df = risk_df.sort_values('date')
@@ -647,7 +666,7 @@ def plot_risk_bar_chart(risk_df):
     # 日付を文字列フォーマットに変換
     date_labels = [d.strftime('%m/%d') for d in risk_df['date']]
     
-    # リスクレベルに対応する色を更新
+    # リスクレベルに対応する色を定義
     risk_colors = {
         "極低": "#0000cc",  # 青
         "低": "#0000cc",    # 青
@@ -659,48 +678,93 @@ def plot_risk_bar_chart(risk_df):
     # データに基づく色のリスト作成
     bar_colors = [risk_colors[level] for level in risk_df['risk_level']]
     
+    # インデックスベースのX軸位置を作成
+    x_positions = np.arange(len(risk_df))
+    
     # 棒グラフをプロット
     bars = ax.bar(
-        date_labels, 
+        x_positions, 
         risk_df['risk_hours'],
         color=bar_colors,
         width=0.7
     )
     
-    # X軸ラベルの回転
-    plt.xticks(rotation=45, ha='right')
+    # X軸のティックとラベルを非表示にする
+    ax.set_xticks([])
+    ax.set_xticklabels([])
     
-    # Y軸のラベルと上限
-    ax.set_ylabel('条件を満たす時間数')
-    ax.set_ylim(0, max(40, risk_df['risk_hours'].max() * 1.1))  # 最大値よりも少し大きめに
+    # Y軸の設定
+    ax.set_ylabel('条件を満たす時間数', fontsize=12)
     
-    ax.set_title('過去10日間の灰色かび病リスク推移')
+    # Y軸の上限を固定して、日付表示用のスペースを確保
+    # 基本的に40時間を上限とし、それより大きい値がある場合はそれに少し余裕を持たせる
+    max_data = risk_df['risk_hours'].max()
+    y_max = max(40, max_data * 1.1)
     
-    # リスクレベルの凡例を更新
-    from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor=risk_colors["極低"], label='極低 (0時間)'),
-        Patch(facecolor=risk_colors["低"], label='低 (1-10時間)'),
-        Patch(facecolor=risk_colors["中"], label='中 (11-20時間)'),
-        Patch(facecolor=risk_colors["高"], label='高 (21-30時間)'),
-        Patch(facecolor=risk_colors["極高"], label='極高 (31時間以上)')
-    ]
-    ax.legend(handles=legend_elements, loc='upper right')
+    # 日付表示のために十分なスペースを確保
+    ax.set_ylim(0, y_max * 1.2)  # 上限を40％増やして日付用のスペースを確保
+    
+    # 最初と最後の日付を取得して期間をタイトルに表示
+    first_date = date_labels[0]
+    last_date = date_labels[-1]
+    ax.set_title(f'過去10日間の灰色かび病リスク推移\n({first_date}～{last_date})', fontsize=14)
     
     # 各棒の上に時間数を表示
-    for bar, hours in zip(bars, risk_df['risk_hours']):
+    for i, (bar, hours) in enumerate(zip(bars, risk_df['risk_hours'])):
         height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+        # 時間数を棒の上に表示
+        ax.text(bar.get_x() + bar.get_width()/2., height + 1,
                 f'{hours}時間',
-                ha='center', va='bottom', rotation=0)
+                ha='center', va='bottom', fontsize=9, fontweight='bold')
+    
+    # 日付を40時間ラインの上に表示（棒グラフから離して）
+    date_y_position = 43  # 40時間ラインより少し上
+    for i, (x, date) in enumerate(zip(x_positions, date_labels)):
+        # すべての日付を表示するか、偶数番目と最後の日付のみ表示するかを選択可能
+        if i % 2 == 0 or i == len(date_labels) - 1:  # 偶数または最後のみ表示
+            ax.text(x, date_y_position, date, 
+                    ha='center', va='bottom', fontsize=14)
+    
+    # グリッド線を追加して読みやすくする
+    ax.yaxis.grid(True, linestyle='--', alpha=0.7)
+    
+    # リスクレベルの凡例をスマホに最適化
+    ax_legend.axis('off')  # 軸を非表示
+    
+    # リスクレベル区分を定義
+    risk_levels = ["極低 (0時間)", "低 (1-10時間)", "中 (11-20時間)", "高 (21-30時間)", "極高 (31時間以上)"]
+    risk_colors_list = [risk_colors["極低"], risk_colors["低"], risk_colors["中"], 
+                         risk_colors["高"], risk_colors["極高"]]
+    
+    # 凡例を横に並べて表示（スマホに最適化）
+    from matplotlib.patches import Patch
+    box_width = 0.15
+    gap = 0.05
+    total_width = (box_width + gap) * len(risk_levels) - gap
+    start_x = (1 - total_width) / 2
+    
+    for i, (level, color) in enumerate(zip(risk_levels, risk_colors_list)):
+        x = start_x + i * (box_width + gap)
+        # 色付きのボックスを描画
+        rect = patches.Rectangle((x, 0.4), box_width, 0.4, facecolor=color)
+        ax_legend.add_patch(rect)
+        # テキストラベルを追加
+        ax_legend.text(x + box_width/2, 0.15, level, ha='center', va='center', fontsize=8)
+    
+    # 凡例のタイトル
+    ax_legend.text(0.5, 0.9, "リスクレベル区分", ha='center', va='center', fontsize=10, fontweight='bold')
     
     plt.tight_layout()
+    plt.subplots_adjust(hspace=0.1)  # サブプロット間の隙間を調整
     return fig
 
-# ヒートマップ表示関数（新しい時系列表示オプション）
+# ヒートマップ表示関数（スマホ向けに最適化）
 def plot_risk_heatmap(risk_df):
-    """リスクをカレンダー形式のヒートマップで表示する関数"""
-    fig, ax = plt.subplots(figsize=(14, 3))
+    """リスクをカレンダー形式のヒートマップで表示する関数（スマホ対応版）"""
+    # スマホ向けにサイズとレイアウトを調整
+    fig, axes = plt.subplots(2, 1, figsize=(8, 4.5), gridspec_kw={'height_ratios': [3, 1]})
+    ax = axes[0]  # メインのヒートマップ用
+    ax_legend = axes[1]  # 凡例用
     
     # 日付を古い順にソートし、月-日形式に変換
     risk_df = risk_df.sort_values('date')
@@ -716,38 +780,53 @@ def plot_risk_heatmap(risk_df):
     risk_cmap = LinearSegmentedColormap.from_list('risk_cmap', colors)
     norm = plt.Normalize(0, 40)  # 0-40時間の範囲
     
-    # リスク時間数を2D配列に変換（1行×日数列のマトリックス）
+    # リスク時間数を2D配列に変換
     risk_matrix = risk_df['risk_hours'].values.reshape(1, -1)
     
     # ヒートマップの描画
     heatmap = ax.pcolormesh(risk_matrix, cmap=risk_cmap, norm=norm, edgecolors='white', linewidth=1)
     
-    # カラーバーの追加
-    cbar = plt.colorbar(heatmap, ax=ax, orientation='vertical', pad=0.01)
-    cbar.set_label('条件を満たす時間数')
-    
     # Y軸ラベルの設定（空にする）
     ax.set_yticks([])
     
-    # X軸に日付ラベルを設定（4日ごとに表示）
+    # X軸の設定
     total_days = len(date_labels)
-    # すべてのX位置を計算
-    xtick_positions = np.arange(len(date_labels)) + 0.5
+    xtick_positions = np.arange(total_days) + 0.5
     
-    # 表示間隔を計算（合計日数に応じて調整）
-    if total_days > 20:
-        step = 4  # 28日なら4日ごと（約7ラベル）
-    else:
-        step = 2  # 少ない日数なら2日ごと
+    # 最初と最後の日付のみラベル表示
+    ax.set_xticks([xtick_positions[0], xtick_positions[-1]])
+    ax.set_xticklabels([date_labels[0], date_labels[-1]], fontsize=12, fontweight='bold')
     
-    # 間引いたインデックスとラベルを設定
-    xtick_indices = range(0, total_days, step)
-    ax.set_xticks([xtick_positions[i] for i in xtick_indices])
-    ax.set_xticklabels([date_labels[i] for i in xtick_indices], rotation=45, ha='right')
-    
-    # すべての日の位置に薄い縦線を追加（日付の区切りを示す）
+    # 日付の区切り線
     for x in xtick_positions:
         ax.axvline(x, color='lightgray', linestyle='-', linewidth=0.5, alpha=0.3)
+    
+    # タイトル
+    ax.set_title(f"過去30日間の灰色かび病リスク推移 ({date_labels[0]}～{date_labels[-1]})", fontsize=20)
+    
+    # 凡例を描画するサブプロットの設定
+    ax_legend.axis('off')
+    
+    # リスクレベル区分の定義
+    risk_levels = ["極低 (0時間)", "低 (1-10時間)", "中 (11-20時間)", "高 (21-30時間)", "極高 (31時間以上)"]
+    risk_colors = [colors[0], colors[0], colors[1], colors[2], colors[3]]
+    
+    # 凡例を横に並べて表示（スマホに最適化）
+    box_width = 0.15
+    gap = 0.05
+    total_width = (box_width + gap) * len(risk_levels) - gap
+    start_x = (1 - total_width) / 2
+    
+    for i, (level, color) in enumerate(zip(risk_levels, risk_colors)):
+        x = start_x + i * (box_width + gap)
+        # 色付きのボックスを描画
+        rect = patches.Rectangle((x, 0.4), box_width, 0.4, facecolor=color)
+        ax_legend.add_patch(rect)
+        # テキストラベルを追加（スマホで読みやすいようにフォントサイズ調整）
+        ax_legend.text(x + box_width/2, 0.15, level, ha='center', va='center', fontsize=8)
+    
+    # 凡例のタイトル
+    ax_legend.text(0.5, 0.9, "リスクレベル区分", ha='center', va='center', fontsize=10, fontweight='bold')
     
     plt.tight_layout()
     return fig
@@ -852,7 +931,6 @@ def main():
                 st.markdown("---")
                 
                 # 3. 時系列リスクのヒートマップ表示（28日間）
-                st.header("過去30日間の灰色かび病リスク推移（ヒートマップ）")
                 heat_fig = plot_risk_heatmap(time_series_risk_df)
                 st.pyplot(heat_fig)
                 
