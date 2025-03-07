@@ -8,6 +8,7 @@ from typing import List, Tuple
 import numpy as np
 import os
 import re
+from matplotlib.patches import Patch
 
 # 灰色かび病リスクチェック関数
 def check_gray_mold_risk(temp_humidity_data: List[Tuple[float, float]], timestamps) -> Tuple[str, int, str]:
@@ -284,10 +285,8 @@ def try_multiple_encodings(file_path):
             df = pd.read_csv(file_path, encoding=encoding)
             return df, encoding
         except Exception as e:
-            st.info(f"エンコーディング {encoding} での読み込み失敗: {str(e)}")
             continue
-    
-    st.error("すべてのエンコーディングでの読み込みに失敗しました")
+
     return None, None
 
 def combine_date_time(df, date_col='日付', time_col='時刻'):
@@ -453,6 +452,9 @@ def plot_speedometer(percentage, color, risk_level, risk_hours):
     """
     fig, ax = plt.subplots(figsize=(8, 4.5))
     
+    fig.patch.set_facecolor('white')
+    ax.set_facecolor('white')
+    
     # 背景の半円弧（薄いグレー）
     theta = np.linspace(180, 0, 100) * np.pi / 180.0
     r = 0.8
@@ -495,22 +497,22 @@ def plot_speedometer(percentage, color, risk_level, risk_hours):
     
     # リスク時間のテキスト
     ax.text(0, -0.6, f"{risk_hours}時間", ha='center', va='center', 
-            fontsize=14, color='#303030')
+            fontsize=18, color='#303030')
     
     # 目盛り表示
     labels = ["極低", "低", "中", "高", "極高"]
     angles = np.linspace(180, 0, 5) * np.pi / 180.0
     for label, angle in zip(labels, angles):
-        x = 1.0 * np.cos(angle)
-        y = 1.0 * np.sin(angle)
-        ax.text(x, y, label, ha='center', va='center', fontsize=10)
+        x = 1.05 * np.cos(angle)
+        y = 1.05 * np.sin(angle)
+        ax.text(x, y, label, ha='center', va='center', fontsize=18)
     
     # スケール表示（時間数）
     scales = ["0", "10", "20", "30", "40+"]
     for scale, angle in zip(scales, angles):
         x = 0.81 * np.cos(angle)
         y = 0.81 * np.sin(angle)
-        ax.text(x, y, scale, ha='center', va='center', fontsize=8, color='gray')
+        ax.text(x, y, scale, ha='center', va='center', fontsize=18, color='gray')
     
     # グラフの設定
     ax.set_xlim(-1.2, 1.2)
@@ -601,7 +603,6 @@ def detect_device_type(file_path):
                 pass
     
     # 推測できない場合
-    print("警告: デバイスタイプを自動検出できません。PFとして処理を試みます。")
     return 'PF'
 
 # 棒グラフ描画関数
@@ -635,7 +636,7 @@ def plot_risk_bar_chart(risk_df):
     
     # 棒グラフをプロット
     bars = ax.bar(
-        x_positions, 
+        x_positions,
         risk_df['risk_hours'],
         color=bar_colors,
         width=0.7
@@ -646,7 +647,7 @@ def plot_risk_bar_chart(risk_df):
     ax.set_xticklabels([])
     
     # Y軸の設定
-    ax.set_ylabel('条件を満たす時間数', fontsize=12)
+    ax.set_ylabel('条件を満たす時間数', fontsize=16)
     
     # Y軸の上限を固定して、日付表示用のスペースを確保
     # 基本的に40時間を上限とし、それより大きい値がある場合はそれに少し余裕を持たせる
@@ -667,7 +668,7 @@ def plot_risk_bar_chart(risk_df):
         # 時間数を棒の上に表示
         ax.text(bar.get_x() + bar.get_width()/2., height + 1,
                 f'{hours}時間',
-                ha='center', va='bottom', fontsize=10, fontweight='bold')
+                ha='center', va='bottom', fontsize=18, fontweight='bold')
     
     # 日付を40時間ラインの上に表示（棒グラフから離して）
     date_y_position = 43  # 40時間ラインより少し上
@@ -689,7 +690,7 @@ def plot_risk_bar_chart(risk_df):
                          risk_colors["高"], risk_colors["極高"]]
     
     # 凡例を横に並べて表示（スマホに最適化）
-    from matplotlib.patches import Patch
+    
     box_width = 0.15
     gap = 0.05
     total_width = (box_width + gap) * len(risk_levels) - gap
@@ -776,10 +777,10 @@ def plot_risk_heatmap(risk_df):
         rect = patches.Rectangle((x, -0.2), box_width, 0.4, facecolor=color)
         ax_legend.add_patch(rect)
         # テキストラベルを追加（ボックスの下に配置）
-        ax_legend.text(x + box_width/2, -0.5, level, ha='center', va='center', fontsize=10)
+        ax_legend.text(x + box_width/2, -0.5, level, ha='center', va='center', fontsize=16)
     
     # 凡例のタイトル（下げる）
-    ax_legend.text(0.5, 0.4, "リスクレベル区分", ha='center', va='center', fontsize=10, fontweight='bold')
+    ax_legend.text(0.5, 0.4, "リスクレベル区分", ha='center', va='center', fontsize=16, fontweight='bold')
     
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.05)
