@@ -49,7 +49,7 @@ def check_gray_mold_risk(temp_humidity_data: List[Tuple[float, float]], timestam
         return "極高", risk_hours, "red"
 
 # CSVファイルから気温データと相対湿度データを読み込む関数
-def read_temperature_and_humidity_data(file_obj, device_type=None):
+def read_temperature_and_humidity_data(file_obj, device_type=None, days_to_keep=30):
     """
     様々な形式のセンサーデータファイルから温度と湿度のデータを読み込む関数
     
@@ -59,13 +59,10 @@ def read_temperature_and_humidity_data(file_obj, device_type=None):
         Streamlitでアップロードされたファイルオブジェクトまたはファイルパス
     device_type : str, optional
         デバイスタイプ ('HZ', 'PF', 'PF2', 'SB', 'OT', 'HN', None)
-        None の場合はデフォルト形式またはファイル内容から推測を試みる
-        
-    Returns:
-    -------
-    tuple
-        (temperature_list, humidity_list, timestamps)
+    days_to_keep : int, optional
+        保持する日数（最新のN日分）。デフォルトは30日。
     """
+    
     # メイン処理開始
     temp_path = None
     try:
@@ -229,6 +226,26 @@ def read_temperature_and_humidity_data(file_obj, device_type=None):
             st.error("タイムスタンプ列が見つかりません")
             return None, None, None
         
+        if timestamp_found:
+            if len(df) > 0:  # 空のDataFrameでないことを確認
+                # 最新の日付を特定
+                latest_date = df.index.max()
+                # 期間を計算
+                cutoff_date = latest_date - pd.Timedelta(days=days_to_keep)
+                # 期間内のデータのみ保持
+                df_filtered = df[df.index >= cutoff_date]
+                
+                st.info(f"読み込んだ全期間: {df.index.min()} から {latest_date} ({len(df)}行)")
+                st.info(f"フィルタ後の期間: {df_filtered.index.min() if not df_filtered.empty else 'なし'} から {df_filtered.index.max() if not df_filtered.empty else 'なし'} ({len(df_filtered)}行)")
+                
+                # フィルタ後にデータが残っていることを確認
+                if not df_filtered.empty:
+                    # 元のデータフレームを更新
+                    df = df_filtered
+                else:
+                    st.warning(f"最新の{days_to_keep}日間にデータがありません。すべてのデータを保持します。")
+            
+                
         # 温度と湿度の列を特定
         temp_col = None
         for col in config['temp_cols']:
@@ -477,67 +494,6 @@ def calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=30):
     
     return pd.DataFrame(daily_risks)
 
-# 棒グラフ描画関数
-def plot_risk_bar_chart(risk_df):
-    """過去の日別リスクを棒グラフで表示する関数"""
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    # 日付を古い順にソート
-    risk_df = risk_df.sort_values('date')
-    
-    # 日付を文字列フォーマットに変換
-    date_labels = [d.strftime('%m/%d') for d in risk_df['date']]
-    
-    # リスクレベルに対応する色を更新
-    risk_colors = {
-        "極低": "#0000cc",  # 青
-        "低": "#0000cc",    # 青
-        "中": "#00cc00",    # 緑
-        "高": "#ff8000",    # オレンジ
-        "極高": "#cc0000"   # 赤
-    }
-    
-    # データに基づく色のリスト作成
-    bar_colors = [risk_colors[level] for level in risk_df['risk_level']]
-    
-    # 棒グラフをプロット
-    bars = ax.bar(
-        date_labels, 
-        risk_df['risk_hours'],
-        color=bar_colors,
-        width=0.7
-    )
-    
-    # X軸ラベルの回転
-    plt.xticks(rotation=45, ha='right')
-    
-    # Y軸のラベルと上限
-    ax.set_ylabel('条件を満たす時間数')
-    ax.set_ylim(0, max(40, risk_df['risk_hours'].max() * 1.1))  # 最大値よりも少し大きめに
-    
-    ax.set_title('過去10日間の灰色かび病リスク推移')
-    
-    # リスクレベルの凡例を更新
-    from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor=risk_colors["極低"], label='極低 (0時間)'),
-        Patch(facecolor=risk_colors["低"], label='低 (1-10時間)'),
-        Patch(facecolor=risk_colors["中"], label='中 (11-20時間)'),
-        Patch(facecolor=risk_colors["高"], label='高 (21-30時間)'),
-        Patch(facecolor=risk_colors["極高"], label='極高 (31時間以上)')
-    ]
-    ax.legend(handles=legend_elements, loc='upper right')
-    
-    # 各棒の上に時間数を表示
-    for bar, hours in zip(bars, risk_df['risk_hours']):
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
-                f'{hours}時間',
-                ha='center', va='bottom', rotation=0)
-    
-    plt.tight_layout()
-    return fig
-
 # スピードメーターのみを残して他の可視化関数を削除
 def plot_speedometer(percentage, color, risk_level, risk_hours):
     """
@@ -680,6 +636,67 @@ def detect_device_type(file_path):
     print("警告: デバイスタイプを自動検出できません。PFとして処理を試みます。")
     return 'PF'
 
+# 棒グラフ描画関数
+def plot_risk_bar_chart(risk_df):
+    """過去の日別リスクを棒グラフで表示する関数"""
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # 日付を古い順にソート
+    risk_df = risk_df.sort_values('date')
+    
+    # 日付を文字列フォーマットに変換
+    date_labels = [d.strftime('%m/%d') for d in risk_df['date']]
+    
+    # リスクレベルに対応する色を更新
+    risk_colors = {
+        "極低": "#0000cc",  # 青
+        "低": "#0000cc",    # 青
+        "中": "#00cc00",    # 緑
+        "高": "#ff8000",    # オレンジ
+        "極高": "#cc0000"   # 赤
+    }
+    
+    # データに基づく色のリスト作成
+    bar_colors = [risk_colors[level] for level in risk_df['risk_level']]
+    
+    # 棒グラフをプロット
+    bars = ax.bar(
+        date_labels, 
+        risk_df['risk_hours'],
+        color=bar_colors,
+        width=0.7
+    )
+    
+    # X軸ラベルの回転
+    plt.xticks(rotation=45, ha='right')
+    
+    # Y軸のラベルと上限
+    ax.set_ylabel('条件を満たす時間数')
+    ax.set_ylim(0, max(40, risk_df['risk_hours'].max() * 1.1))  # 最大値よりも少し大きめに
+    
+    ax.set_title('過去10日間の灰色かび病リスク推移')
+    
+    # リスクレベルの凡例を更新
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor=risk_colors["極低"], label='極低 (0時間)'),
+        Patch(facecolor=risk_colors["低"], label='低 (1-10時間)'),
+        Patch(facecolor=risk_colors["中"], label='中 (11-20時間)'),
+        Patch(facecolor=risk_colors["高"], label='高 (21-30時間)'),
+        Patch(facecolor=risk_colors["極高"], label='極高 (31時間以上)')
+    ]
+    ax.legend(handles=legend_elements, loc='upper right')
+    
+    # 各棒の上に時間数を表示
+    for bar, hours in zip(bars, risk_df['risk_hours']):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                f'{hours}時間',
+                ha='center', va='bottom', rotation=0)
+    
+    plt.tight_layout()
+    return fig
+
 # ヒートマップ表示関数（新しい時系列表示オプション）
 def plot_risk_heatmap(risk_df):
     """リスクをカレンダー形式のヒートマップで表示する関数"""
@@ -732,9 +749,6 @@ def plot_risk_heatmap(risk_df):
     for x in xtick_positions:
         ax.axvline(x, color='lightgray', linestyle='-', linewidth=0.5, alpha=0.3)
     
-    # タイトル
-    ax.set_title('過去30日間の灰色かび病リスク（ヒートマップ）')
-    
     plt.tight_layout()
     return fig
 
@@ -772,9 +786,9 @@ def main():
         
         # プログレスバーで処理状況を表示
         with st.spinner('ファイルを読み込んでいます...'):
-            # 拡張版関数を使用してデータを読み込む
+            # 拡張版関数を使用してデータを読み込む（30日分のみ）
             temperature, relative_humidity, timestamps = read_temperature_and_humidity_data(
-                uploaded_file, device_type=selected_device
+                uploaded_file, device_type=selected_device, days_to_keep=30
             )
 
         if temperature is not None and relative_humidity is not None:
