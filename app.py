@@ -351,34 +351,24 @@ def resample_to_hourly(df):
         if not isinstance(df.index, pd.DatetimeIndex):
             st.error("データフレームのインデックスがdatetime型ではありません")
             raise ValueError("日時データの変換に失敗しました")
-
         # 非数値列を除外
         numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-        
         if not numeric_cols:
             st.error("数値型の列が見つかりません")
             return df
-        
         # 数値列のみを使用
         numeric_df = df[numeric_cols].copy()
-        
         # 1時間間隔にリサンプリング
         numeric_df.index = numeric_df.index.floor('H')
-        
         # デバッグ情報
         sample_idx = numeric_df.index[:5].tolist() if len(numeric_df) > 0 else []
-        
         # この時点でインデックスは時間単位に切り捨てられています
         # グループ化とリサンプリング
         df_hourly = numeric_df.groupby(numeric_df.index).mean()
-        
         # 欠損値の補間 (時系列データに適した method='time' を使用)
         df_resampled = df_hourly.resample('1H').interpolate(method='time')
-        
         return df_resampled
-    
     except Exception as e:
-        st.error(f"リサンプリングエラー: {str(e)}")
         import traceback
         st.text(traceback.format_exc())
         return df
@@ -682,7 +672,7 @@ def plot_risk_bar_chart(risk_df):
     ax_legend.axis('off')  # 軸を非表示
     
     # リスクレベル区分を定義
-    risk_levels = ["極低 (0時間)", "低 (1-10時間)", "中 (11-20時間)", "高 (21-30時間)", "極高 (31時間以上)"]
+    risk_levels = ["極低", "低", "中", "高", "極高"]
     risk_colors_list = [risk_colors["極低"], risk_colors["低"], risk_colors["中"], 
                          risk_colors["高"], risk_colors["極高"]]
     
@@ -702,7 +692,7 @@ def plot_risk_bar_chart(risk_df):
         ax_legend.text(x + box_width/2, 0.15, level, ha='center', va='center', fontsize=16)
     
     # 凡例のタイトル
-    ax_legend.text(0.5, 0.9, "リスクレベル区分", ha='center', va='center', fontsize=16, fontweight='bold')
+    ax_legend.text(0.5, 1.0, "リスクレベル区分", ha='center', va='center', fontsize=16, fontweight='bold')
     
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.1)  # サブプロット間の隙間を調整
