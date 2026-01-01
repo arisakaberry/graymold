@@ -1,0 +1,40 @@
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+.conda/
+
+# IDE
+.vscode/
+.idea/
+
+# Data files (user uploads)
+data/
+sample/
+
+# OS files
+.DS_Store
+Thumbs.db
+nul
+
+# Streamlit
+.streamlit/
+
+# Temporary files
+*.tmp
+*.temp
