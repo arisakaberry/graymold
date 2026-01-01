@@ -956,7 +956,7 @@ def main():
     st.title("イチゴ灰色かび病リスク判定ツール")
 
 
-    st.header("CSVファイルアップロード")
+    st.header("CSVファイルアップロード\n※アップロードされたファイルは終了時に削除されます。")
 
     # ファイルアップローダー（センサータイプは自動検出のみ）
     uploaded_file = st.file_uploader("CSVファイルを選択してください。", type=["csv", "xlsx", "xls"])
