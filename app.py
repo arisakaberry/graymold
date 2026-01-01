@@ -956,7 +956,7 @@ def main():
     st.title("イチゴ灰色かび病リスク判定ツール")
 
 
-    st.header("CSVファイルアップロード\n※アップロードされたファイルは終了時に削除されます。")
+    st.header("CSVファイルをアップロードしてください\n※アップロードされたファイルは終了時に自動で削除されます。")
 
     # ファイルアップローダー（センサータイプは自動検出のみ）
     uploaded_file = st.file_uploader("CSVファイルを選択してください。", type=["csv", "xlsx", "xls"])
@@ -985,11 +985,8 @@ def main():
             time_series_risk_df = calculate_time_series_risk(temp_humidity_data, timestamps, days_to_show=28)
 
             # 1. メインの現在リスク表示（スピードメーター）
-            st.header("現在の灰色かび病リスク")
-            st.markdown("<p style='color:gray; font-size:14px;'>（最新日から10日間さかのぼったデータに基づく計算）</p>", unsafe_allow_html=True)   
-            
             # リスクレベル表示
-            st.markdown(f"<h3 style='color: {current_color};'>灰色かび病の発病リスク: {current_risk_level}</h3>", unsafe_allow_html=True)
+            st.markdown(f"<h2 style='color: {current_color};'>灰色かび病の発病リスク: {current_risk_level}</h2>", unsafe_allow_html=True)
             st.markdown(f"<p style='font-size:18px; font-weight:bold;'>過去10日間で条件を満たす時間数: {current_risk_hours}時間</p>", unsafe_allow_html=True)
 
             # 推奨対策表示
@@ -1038,6 +1035,15 @@ def main():
                     st.dataframe(display_df)
             else:
                 st.warning("表示可能な時系列データがありません。より長期間のデータを含むCSVファイルをアップロードしてください。")
+
+    # コピーライト表示
+    st.markdown("---")
+    st.markdown(
+        "<p style='text-align: center; color: gray; font-size: 12px;'>"
+        "&copy; 大分県農林水産研究指導センター農業研究部"
+        "</p>",
+        unsafe_allow_html=True
+    )
 
 if __name__ == "__main__":
     main()
