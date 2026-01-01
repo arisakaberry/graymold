@@ -954,7 +954,7 @@ def plot_risk_heatmap(risk_df):
 def main():
     st.set_page_config(page_title="🍓 イチゴ灰色かび病リスク判定ツール", layout="wide")
     st.title("🍓 イチゴ灰色かび病リスク判定ツール")
-    st.header("👇CSVファイルをアップロードしてください\n　※アップロードされたファイルは終了時に自動的に削除されます。")
+    st.header("👇CSVファイルをアップロードしてください\n※アップロードされたファイルは終了時自動的に削除されます。")
 
     # ファイルアップローダー（センサータイプは自動検出のみ）
     uploaded_file = st.file_uploader("CSVファイルを選択してください。", type=["csv", "xlsx", "xls"])
